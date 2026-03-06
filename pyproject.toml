@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pgstac-geoparquet-exporter"
+version = "0.0.1"
+description = "Export pgSTAC collections to GeoParquet."
+requires-python = ">=3.11"
+
+[tool.setuptools]
+py-modules = ["pgstac_geoparquet_exporter"]
