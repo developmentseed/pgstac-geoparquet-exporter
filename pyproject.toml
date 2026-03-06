@@ -12,7 +12,14 @@ requires-python = ">=3.11"
 dev = [
     "pytest>=9.0.0",
     "pre-commit>=4.0.0",
+    "mypy>=1.19.0",
 ]
 
 [tool.setuptools]
-py-modules = ["pgstac_geoparquet_exporter"]
+packages = ["pgstac_geoparquet_exporter"]
+package-dir = {"" = "src"}
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+disallow_untyped_defs = false

@@ -3,11 +3,11 @@ repos:
     rev: v0.8.4
     hooks:
       - id: ruff
-        args: ["--fix", "pgstac_geoparquet_exporter.py", "tests/"]
+        args: ["--fix", "src/", "tests/"]
         pass_filenames: false
         always_run: true
       - id: ruff-format
-        args: ["pgstac_geoparquet_exporter.py", "tests/"]
+        args: ["src/", "tests/"]
         pass_filenames: false
         always_run: true
 
@@ -18,3 +18,21 @@ repos:
         args: ["--fix", "README.md"]
         pass_filenames: false
         always_run: true
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: pytest
+        language: system
+        args: ["tests/"]
+        pass_filenames: false
+        always_run: true
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        args: ["src/", "tests/"]
+        pass_filenames: false
+        always_run: true
+        require_serial: true

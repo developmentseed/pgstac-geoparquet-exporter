@@ -1,4 +1,4 @@
-from pgstac_geoparquet_exporter import main
+from pgstac_geoparquet_exporter.__main__ import main
 
 
 def test_main_returns_zero():
