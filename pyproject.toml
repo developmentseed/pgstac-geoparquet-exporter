@@ -7,12 +7,22 @@ name = "pgstac-geoparquet-exporter"
 version = "0.0.1"
 description = "Export pgSTAC collections to GeoParquet."
 requires-python = ">=3.11"
+dependencies = [
+    "stac-geoparquet>=0.7.0",
+    "psycopg[binary]>=3.0",
+    "psycopg-pool>=3.0",
+    "pypgstac>=0.8.0",
+    "pyyaml>=6.0",
+    "fsspec>=2023.1.0",
+    "tqdm>=4.0.0",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=9.0.0",
     "pre-commit>=4.0.0",
     "mypy>=1.19.0",
+    "types-PyYAML>=6.0",
 ]
 
 [tool.setuptools]
