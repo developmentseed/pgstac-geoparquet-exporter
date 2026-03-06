@@ -1,0 +1,35 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "python",
+      "version-file": "pyproject.toml",
+      "changelog-sections": [
+        {
+          "type": "feat",
+          "section": "Features",
+          "hidden": false
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes",
+          "hidden": false
+        },
+        {
+          "type": "chore",
+          "section": "Chores",
+          "hidden": false
+        },
+        {
+          "type": "ci",
+          "section": "CI/CD",
+          "hidden": false
+        },
+        {
+          "type": "test",
+          "section": "Tests",
+          "hidden": false
+        }
+      ]
+    }
+  }
+}
