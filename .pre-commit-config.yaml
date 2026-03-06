@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: ["--fix", "pgstac_geoparquet_exporter.py", "tests/"]
+        pass_filenames: false
+        always_run: true
+      - id: ruff-format
+        args: ["pgstac_geoparquet_exporter.py", "tests/"]
+        pass_filenames: false
+        always_run: true
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.42.0
+    hooks:
+      - id: markdownlint
+        args: ["--fix", "README.md"]
+        pass_filenames: false
+        always_run: true

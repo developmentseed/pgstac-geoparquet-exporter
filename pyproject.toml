@@ -8,5 +8,10 @@ version = "0.0.1"
 description = "Export pgSTAC collections to GeoParquet."
 requires-python = ">=3.11"
 
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=4.0.0",
+]
+
 [tool.setuptools]
 py-modules = ["pgstac_geoparquet_exporter"]
