@@ -1,0 +1,138 @@
+{{- $jobs := list "complete" "incremental" -}}
+{{- range $mode := $jobs -}}
+{{- $config := index $.Values.jobs $mode -}}
+{{- if $config.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "pgstac-geoparquet-exporter.fullname" $ }}-{{ $mode }}
+  namespace: {{ include "pgstac-geoparquet-exporter.namespace" $ }}
+  labels:
+    {{- include "pgstac-geoparquet-exporter.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $mode }}-export
+  {{- with $.Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  schedule: {{ $config.schedule | quote }}
+  successfulJobsHistoryLimit: {{ $.Values.jobs.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ $.Values.jobs.failedJobsHistoryLimit }}
+  concurrencyPolicy: {{ $.Values.jobs.concurrencyPolicy }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "pgstac-geoparquet-exporter.selectorLabels" $ | nindent 12 }}
+            app.kubernetes.io/component: {{ $mode }}-export
+            app: geoparquet-export
+            mode: {{ $mode }}
+          {{- with $.Values.annotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        spec:
+          restartPolicy: {{ $.Values.jobs.restartPolicy }}
+          {{- with $.Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+          - name: exporter
+            image: {{ include "pgstac-geoparquet-exporter.image" $ }}
+            imagePullPolicy: {{ $.Values.image.pullPolicy }}
+            {{- with $.Values.securityContext }}
+            securityContext:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            env:
+            - name: EXPORT_MODE
+              value: {{ $mode | quote }}
+            - name: CONFIG_PATH
+              value: "/config/export-config.yaml"
+            - name: OUTPUT_PATH
+              value: {{ $.Values.storage.outputPath | quote }}
+            - name: PGHOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.existingSecret }}
+                  key: {{ $.Values.database.secretKeys.host }}
+            - name: PGPORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.existingSecret }}
+                  key: {{ $.Values.database.secretKeys.port }}
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.existingSecret }}
+                  key: {{ $.Values.database.secretKeys.database }}
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.existingSecret }}
+                  key: {{ $.Values.database.secretKeys.user }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.existingSecret }}
+                  key: {{ $.Values.database.secretKeys.password }}
+            {{- if $.Values.storage.existingSecret }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.storage.existingSecret }}
+                  key: {{ $.Values.storage.secretKeys.accessKeyId }}
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.storage.existingSecret }}
+                  key: {{ $.Values.storage.secretKeys.secretAccessKey }}
+            {{- end }}
+            {{- with $.Values.storage.endpoint }}
+            - name: AWS_S3_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with $.Values.storage.region }}
+            - name: AWS_REGION
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with $.Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            {{- with $.Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            resources:
+              {{- toYaml $config.resources | nindent 14 }}
+          volumes:
+          - name: config
+            configMap:
+              name: {{ include "pgstac-geoparquet-exporter.fullname" $ }}-config
+          {{- with $.Values.extraVolumes }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+          {{- with $.Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+{{- end }}

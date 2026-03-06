@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pgstac-geoparquet-exporter.fullname" . }}-config
+  namespace: {{ include "pgstac-geoparquet-exporter.namespace" . }}
+  labels:
+    {{- include "pgstac-geoparquet-exporter.labels" . | nindent 4 }}
+  {{- with .Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  export-config.yaml: |
+    collections:
+    {{- range .Values.exportConfig.collections }}
+      - name: {{ .name }}
+        partition_by: {{ .partition_by | default "null" }}
+        {{- with .start_year }}
+        start_year: {{ . }}
+        {{- end }}
+        {{- with .start_month }}
+        start_month: {{ . }}
+        {{- end }}
+    {{- end }}
+
+    settings:
+      chunk_size: {{ printf "%d" (int .Values.exportConfig.settings.chunk_size) }}
+      statement_timeout: {{ printf "%d" (int .Values.exportConfig.settings.statement_timeout) }}

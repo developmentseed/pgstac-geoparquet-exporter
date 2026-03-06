@@ -1,0 +1,16 @@
+apiVersion: v2
+name: pgstac-geoparquet-exporter
+description: A Helm chart for pgSTAC GeoParquet Exporter - Export STAC collections from pgSTAC to GeoParquet format
+type: application
+version: 0.0.1
+appVersion: "0.0.1"
+keywords:
+  - stac
+  - geoparquet
+  - pgstac
+  - export
+maintainers:
+  - name: pgstac-geoparquet-exporter
+home: https://github.com/developmentseed/pgstac-geoparquet-exporter
+sources:
+  - https://github.com/developmentseed/pgstac-geoparquet-exporter

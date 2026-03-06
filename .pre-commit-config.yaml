@@ -19,6 +19,11 @@ repos:
         pass_filenames: false
         always_run: true
 
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+
   - repo: local
     hooks:
       - id: pytest
@@ -36,3 +41,19 @@ repos:
         pass_filenames: false
         always_run: true
         require_serial: true
+      - id: helm-lint
+        name: helm lint
+        entry: helm lint
+        language: system
+        args: ["charts/pgstac-geoparquet-exporter"]
+        pass_filenames: false
+        always_run: true
+        files: ^charts/.*\.(yaml|tpl)$
+      - id: helm-unittest
+        name: helm unittest
+        entry: helm unittest
+        language: system
+        args: ["charts/pgstac-geoparquet-exporter"]
+        pass_filenames: false
+        always_run: true
+        files: ^charts/.*\.(yaml|tpl)$

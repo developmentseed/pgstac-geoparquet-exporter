@@ -1,0 +1,420 @@
+suite: test cronjob
+templates:
+  - cronjob.yaml
+tests:
+  - it: should render both cronjobs by default
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: CronJob
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-pgstac-geoparquet-exporter-complete
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-pgstac-geoparquet-exporter-incremental
+        documentIndex: 1
+
+  - it: should set correct schedules
+    asserts:
+      - equal:
+          path: spec.schedule
+          value: "0 2 1 * *"
+        documentIndex: 0
+      - equal:
+          path: spec.schedule
+          value: "0 3 * * *"
+        documentIndex: 1
+
+  - it: should only render complete job when incremental is disabled
+    set:
+      jobs.incremental.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-pgstac-geoparquet-exporter-complete
+
+  - it: should only render incremental job when complete is disabled
+    set:
+      jobs.complete.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-pgstac-geoparquet-exporter-incremental
+
+  - it: should render no jobs when both are disabled
+    set:
+      jobs.complete.enabled: false
+      jobs.incremental.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should set correct component labels
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: complete-export
+        documentIndex: 0
+      - equal:
+          path: spec.jobTemplate.spec.template.metadata.labels["app.kubernetes.io/component"]
+          value: complete-export
+        documentIndex: 0
+      - equal:
+          path: spec.jobTemplate.spec.template.metadata.labels.mode
+          value: complete
+        documentIndex: 0
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: incremental-export
+        documentIndex: 1
+
+  - it: should set job history limits
+    asserts:
+      - equal:
+          path: spec.successfulJobsHistoryLimit
+          value: 3
+        documentIndex: 0
+      - equal:
+          path: spec.failedJobsHistoryLimit
+          value: 3
+        documentIndex: 0
+
+  - it: should set custom job history limits
+    set:
+      jobs.successfulJobsHistoryLimit: 5
+      jobs.failedJobsHistoryLimit: 10
+    asserts:
+      - equal:
+          path: spec.successfulJobsHistoryLimit
+          value: 5
+      - equal:
+          path: spec.failedJobsHistoryLimit
+          value: 10
+
+  - it: should set concurrency policy
+    asserts:
+      - equal:
+          path: spec.concurrencyPolicy
+          value: Forbid
+
+  - it: should set restart policy
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.restartPolicy
+          value: OnFailure
+
+  - it: should set correct image
+    set:
+      image.repository: custom-repo/exporter
+      image.tag: v1.0.0
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].image
+          value: custom-repo/exporter:v1.0.0
+
+  - it: should set correct resources for complete job
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].resources.requests.memory
+          value: 2Gi
+        documentIndex: 0
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].resources.requests.cpu
+          value: 500m
+        documentIndex: 0
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].resources.limits.memory
+          value: 4Gi
+        documentIndex: 0
+
+  - it: should set correct resources for incremental job
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].resources.requests.memory
+          value: 1Gi
+        documentIndex: 1
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].resources.limits.cpu
+          value: 1000m
+        documentIndex: 1
+
+  - it: should set EXPORT_MODE environment variable correctly
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: EXPORT_MODE
+            value: complete
+        documentIndex: 0
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: EXPORT_MODE
+            value: incremental
+        documentIndex: 1
+
+  - it: should set database environment variables from secret
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: PGHOST
+            valueFrom:
+              secretKeyRef:
+                name: default-pguser-eoapi
+                key: host
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: PGDATABASE
+            valueFrom:
+              secretKeyRef:
+                name: default-pguser-eoapi
+                key: dbname
+
+  - it: should use custom database secret
+    set:
+      database.existingSecret: my-custom-secret
+      database.secretKeys.host: custom-host-key
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: PGHOST
+            valueFrom:
+              secretKeyRef:
+                name: my-custom-secret
+                key: custom-host-key
+
+  - it: should set AWS credentials when storage secret is provided
+    set:
+      storage.existingSecret: aws-credentials
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: aws-credentials
+                key: AWS_ACCESS_KEY_ID
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: aws-credentials
+                key: AWS_SECRET_ACCESS_KEY
+
+  - it: should not set AWS credentials when storage secret is not provided
+    asserts:
+      - notContains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: AWS_ACCESS_KEY_ID
+
+  - it: should set AWS endpoint when provided
+    set:
+      storage.endpoint: https://s3.custom-endpoint.com
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: AWS_S3_ENDPOINT
+            value: https://s3.custom-endpoint.com
+
+  - it: should set AWS region when provided
+    set:
+      storage.region: us-west-2
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: AWS_REGION
+            value: us-west-2
+
+  - it: should set OUTPUT_PATH environment variable
+    set:
+      storage.outputPath: s3://my-bucket/exports
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: OUTPUT_PATH
+            value: s3://my-bucket/exports
+
+  - it: should mount config volume
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].volumeMounts
+          content:
+            name: config
+            mountPath: /config
+            readOnly: true
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.volumes
+          content:
+            name: config
+            configMap:
+              name: RELEASE-NAME-pgstac-geoparquet-exporter-config
+
+  - it: should add extra environment variables
+    set:
+      extraEnv:
+        - name: CUSTOM_VAR
+          value: custom-value
+        - name: ANOTHER_VAR
+          value: another-value
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: CUSTOM_VAR
+            value: custom-value
+
+  - it: should add extra volumes
+    set:
+      extraVolumes:
+        - name: extra-volume
+          emptyDir: {}
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.volumes
+          content:
+            name: extra-volume
+            emptyDir: {}
+
+  - it: should add extra volume mounts
+    set:
+      extraVolumeMounts:
+        - name: extra-mount
+          mountPath: /extra
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].volumeMounts
+          content:
+            name: extra-mount
+            mountPath: /extra
+
+  - it: should set pod security context
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.securityContext.fsGroup
+          value: 1000
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.securityContext.runAsUser
+          value: 1000
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.securityContext.runAsNonRoot
+          value: true
+
+  - it: should set container security context
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.runAsUser
+          value: 1000
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.capabilities.drop
+          content: ALL
+
+  - it: should set node selector
+    set:
+      nodeSelector:
+        disktype: ssd
+        node-type: compute
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.nodeSelector.disktype
+          value: ssd
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.nodeSelector.node-type
+          value: compute
+
+  - it: should set tolerations
+    set:
+      tolerations:
+        - key: key1
+          operator: Equal
+          value: value1
+          effect: NoSchedule
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.tolerations
+          content:
+            key: key1
+            operator: Equal
+            value: value1
+            effect: NoSchedule
+
+  - it: should set affinity
+    set:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/e2e-az-name
+                    operator: In
+                    values:
+                      - e2e-az1
+    asserts:
+      - isNotEmpty:
+          path: spec.jobTemplate.spec.template.spec.affinity
+
+  - it: should set image pull secrets
+    set:
+      imagePullSecrets:
+        - name: regcred
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.imagePullSecrets
+          content:
+            name: regcred
+
+  - it: should add annotations to cronjob
+    set:
+      annotations:
+        my-annotation: my-value
+    asserts:
+      - equal:
+          path: metadata.annotations["my-annotation"]
+          value: my-value
+
+  - it: should add annotations to pod
+    set:
+      annotations:
+        pod-annotation: pod-value
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.metadata.annotations["pod-annotation"]
+          value: pod-value
+
+  - it: should use custom namespace
+    set:
+      namespaceOverride: custom-namespace
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: custom-namespace
+
+  - it: should use release namespace by default
+    release:
+      namespace: my-release-namespace
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: my-release-namespace

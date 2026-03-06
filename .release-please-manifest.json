@@ -1,3 +1,4 @@
 {
-  ".": "0.0.1"
+  ".": "0.0.1",
+  "charts/pgstac-geoparquet-exporter": "0.0.1"
 }

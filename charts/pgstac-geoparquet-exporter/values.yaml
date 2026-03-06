@@ -1,0 +1,97 @@
+# Default values for pgstac-geoparquet-exporter
+
+image:
+  repository: ghcr.io/developmentseed/pgstac-geoparquet-exporter
+  pullPolicy: Always
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+namespaceOverride: ""
+
+# Export job configurations
+jobs:
+  complete:
+    enabled: true
+    schedule: "0 2 1 * *"  # Monthly
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "500m"
+      limits:
+        memory: "4Gi"
+        cpu: "2000m"
+
+  incremental:
+    enabled: true
+    schedule: "0 3 * * *"  # Daily
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "250m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+
+  # Common settings for all jobs
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  restartPolicy: OnFailure
+
+# PostgreSQL database configuration
+database:
+  existingSecret: "default-pguser-eoapi"
+  secretKeys:
+    host: host
+    port: port
+    database: dbname
+    user: user
+    password: password
+
+# S3/Object storage configuration
+storage:
+  outputPath: "s3://some-bucket/geoparquet"
+  existingSecret: ""
+  secretKeys:
+    accessKeyId: AWS_ACCESS_KEY_ID
+    secretAccessKey: AWS_SECRET_ACCESS_KEY
+  endpoint: ""
+  region: ""
+
+# Export configuration
+exportConfig:
+  collections:
+    - name: ""
+      partition_by: year  # Options: null, year, month
+      start_year: 2015
+
+  settings:
+    chunk_size: 10000
+    statement_timeout: 3600000  # milliseconds
+
+# Additional configuration
+labels: {}
+annotations: {}
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsNonRoot: true
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+extraEnv: []
+extraVolumes: []
+extraVolumeMounts: []

@@ -1,0 +1,33 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Release: {{ .Release.Name }}
+Namespace: {{ include "pgstac-geoparquet-exporter.namespace" . }}
+
+## Installed Components
+
+{{- if .Values.jobs.complete.enabled }}
+✓ Complete Export: {{ .Values.jobs.complete.schedule }}
+{{- end }}
+{{- if .Values.jobs.incremental.enabled }}
+✓ Incremental Export: {{ .Values.jobs.incremental.schedule }}
+{{- end }}
+
+Output: {{ .Values.storage.outputPath }}
+
+Collections:
+{{- range .Values.exportConfig.collections }}
+  - {{ .name }}{{ if .partition_by }} ({{ .partition_by }}){{ end }}
+{{- end }}
+
+## Quick Commands
+
+Check status:
+  kubectl get cronjobs,jobs -n {{ include "pgstac-geoparquet-exporter.namespace" . }}
+
+View logs:
+  kubectl logs -n {{ include "pgstac-geoparquet-exporter.namespace" . }} -l app=geoparquet-export --tail=100
+
+Manual trigger:
+  kubectl create job --from=cronjob/{{ include "pgstac-geoparquet-exporter.fullname" . }}-complete manual-$(date +%s) -n {{ include "pgstac-geoparquet-exporter.namespace" . }}
+
+More: https://github.com/developmentseed/pgstac-geoparquet-exporter

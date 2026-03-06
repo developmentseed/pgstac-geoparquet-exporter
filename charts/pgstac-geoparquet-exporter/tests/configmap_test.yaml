@@ -1,0 +1,137 @@
+suite: test configmap
+templates:
+  - configmap.yaml
+tests:
+  - it: should create a configmap
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-pgstac-geoparquet-exporter-config
+
+  - it: should have correct labels
+    asserts:
+      - isNotEmpty:
+          path: metadata.labels
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: pgstac-geoparquet-exporter
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: RELEASE-NAME
+
+  - it: should add custom annotations
+    set:
+      annotations:
+        custom-annotation: custom-value
+        another-annotation: another-value
+    asserts:
+      - equal:
+          path: metadata.annotations["custom-annotation"]
+          value: custom-value
+      - equal:
+          path: metadata.annotations["another-annotation"]
+          value: another-value
+
+  - it: should render export config with single collection
+    set:
+      exportConfig:
+        collections:
+          - name: test-collection
+            partition_by: year
+            start_year: 2020
+        settings:
+          chunk_size: 5000
+          statement_timeout: 1800000
+    asserts:
+      - matchRegex:
+          path: data["export-config.yaml"]
+          pattern: "name: test-collection"
+      - matchRegex:
+          path: data["export-config.yaml"]
+          pattern: "partition_by: year"
+      - matchRegex:
+          path: data["export-config.yaml"]
+          pattern: "start_year: 2020"
+      - matchRegex:
+          path: data["export-config.yaml"]
+          pattern: "chunk_size: 5000"
+      - matchRegex:
+          path: data["export-config.yaml"]
+          pattern: "statement_timeout: 1800000"
+
+  - it: should render export config with multiple collections
+    set:
+      exportConfig:
+        collections:
+          - name: collection-1
+            partition_by: year
+            start_year: 2015
+          - name: collection-2
+            partition_by: month
+            start_year: 2020
+            start_month: 6
+          - name: collection-3
+            partition_by: null
+        settings:
+          chunk_size: 10000
+          statement_timeout: 3600000
+    asserts:
+      - matchRegex:
+          path: data["export-config.yaml"]
+          pattern: "name: collection-1"
+      - matchRegex:
+          path: data["export-config.yaml"]
+          pattern: "name: collection-2"
+      - matchRegex:
+          path: data["export-config.yaml"]
+          pattern: "name: collection-3"
+
+  - it: should handle partition_by null value
+    set:
+      exportConfig:
+        collections:
+          - name: test-collection
+            partition_by: null
+        settings:
+          chunk_size: 10000
+          statement_timeout: 3600000
+    asserts:
+      - matchRegex:
+          path: data["export-config.yaml"]
+          pattern: "partition_by: null"
+
+  - it: should handle collection with start_month
+    set:
+      exportConfig:
+        collections:
+          - name: monthly-collection
+            partition_by: month
+            start_year: 2020
+            start_month: 3
+        settings:
+          chunk_size: 10000
+          statement_timeout: 3600000
+    asserts:
+      - matchRegex:
+          path: data["export-config.yaml"]
+          pattern: "start_month: 3"
+
+  - it: should handle collection without optional fields
+    set:
+      exportConfig:
+        collections:
+          - name: minimal-collection
+            partition_by: year
+            start_year: 2020
+        settings:
+          chunk_size: 10000
+          statement_timeout: 3600000
+    asserts:
+      - matchRegex:
+          path: data["export-config.yaml"]
+          pattern: "name: minimal-collection"
+      - matchRegex:
+          path: data["export-config.yaml"]
+          pattern: "partition_by: year"
