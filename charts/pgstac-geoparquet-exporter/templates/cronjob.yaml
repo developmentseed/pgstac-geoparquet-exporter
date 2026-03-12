@@ -96,7 +96,11 @@ spec:
                   key: {{ $.Values.storage.secretKeys.secretAccessKey }}
             {{- end }}
             {{- with $.Values.storage.endpoint }}
-            - name: AWS_S3_ENDPOINT
+            - name: AWS_ENDPOINT_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with $.Values.stacApiUrl }}
+            - name: STAC_API_URL
               value: {{ . | quote }}
             {{- end }}
             {{- with $.Values.storage.region }}

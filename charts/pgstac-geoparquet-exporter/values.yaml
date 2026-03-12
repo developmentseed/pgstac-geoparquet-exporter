@@ -10,6 +10,11 @@ nameOverride: ""
 fullnameOverride: ""
 namespaceOverride: ""
 
+# STAC API URL for link injection (required)
+# pgSTAC doesn't store links, so this URL is used to construct
+# self, parent, collection, and root links for exported items.
+stacApiUrl: ""  # e.g., "https://example.com/stac/v1"
+
 # Export job configurations
 jobs:
   complete:

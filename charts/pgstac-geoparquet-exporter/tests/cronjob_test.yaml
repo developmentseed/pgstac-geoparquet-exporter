@@ -228,7 +228,7 @@ tests:
       - contains:
           path: spec.jobTemplate.spec.template.spec.containers[0].env
           content:
-            name: AWS_S3_ENDPOINT
+            name: AWS_ENDPOINT_URL
             value: https://s3.custom-endpoint.com
 
   - it: should set AWS region when provided
