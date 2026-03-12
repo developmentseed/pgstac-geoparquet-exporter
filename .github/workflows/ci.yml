@@ -30,10 +30,12 @@ jobs:
         with:
           k3s-channel: latest
       - name: Run integration test
-        run: ./scripts/integration-test.sh
+        run: ./scripts/integration-test.sh --cleanup
+        env:
+          USE_EXISTING_CLUSTER: "true"
       - name: Debug on failure
         if: failure()
         run: kubectl get all -n test
       - name: Cleanup
         if: always()
-        run: k3d cluster delete pgstac-test || true
+        run: ./scripts/integration/cleanup.sh --namespace || true

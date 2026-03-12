@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pgstac-migrate
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ghcr.io/stac-utils/pgstac-pypgstac:v0.10.0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for database..."
+              pypgstac pgready
+              echo "Running pgSTAC migration..."
+              pypgstac migrate
+              echo "pgSTAC installation complete"
+          env:
+            - name: PGHOST
+              value: pgstac-primary.NAMESPACE_PLACEHOLDER.svc.cluster.local
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: pgstac
+            - name: PGUSER
+              value: postgres
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pgstac-pguser-postgres
+                  key: password
+  backoffLimit: 3

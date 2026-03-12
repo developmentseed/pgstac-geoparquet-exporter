@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stac-data-loader
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: loader
+          image: ghcr.io/stac-utils/pgstac-pypgstac:v0.10.0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Verifying pgSTAC schema..."
+              pypgstac pgready
+              echo "Loading collection..."
+              pypgstac load collections /data/collection.json --method upsert
+              echo "Loading items..."
+              pypgstac load items /data/items.ndjson --method upsert
+              echo "Data loaded successfully"
+          env:
+            - name: PGHOST
+              value: "pgstac-primary.test.svc.cluster.local"
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: "pgstac"
+            - name: PGUSER
+              value: "postgres"
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pgstac-pguser-postgres
+                  key: password
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          configMap:
+            name: stac-test-data

@@ -1,0 +1,26 @@
+{
+  "id": "test-collection",
+  "type": "Collection",
+  "stac_version": "1.0.0",
+  "description": "Test collection for integration testing",
+  "license": "CC0-1.0",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [-180, -90, 180, 90]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        ["2020-01-01T00:00:00Z", "2023-12-31T23:59:59Z"]
+      ]
+    }
+  },
+  "links": [
+    {
+      "rel": "self",
+      "href": "https://example.com/collections/test-collection",
+      "type": "application/json"
+    }
+  ]
+}

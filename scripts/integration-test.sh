@@ -1,149 +1,126 @@
 #!/usr/bin/env bash
+# Integration test orchestrator for pgSTAC GeoParquet Exporter
+#
+# This script runs end-to-end integration tests by orchestrating
+# individual test phases. Each phase is in a separate script for
+# better maintainability and independent testing.
+#
+# Usage:
+#   ./scripts/integration-test.sh [--cleanup] [--skip-validation]
+#
+# Environment variables:
+#   CLUSTER_NAME          - Name of k3d cluster (default: pgstac-test)
+#   NAMESPACE             - Kubernetes namespace (default: test)
+#   USE_EXISTING_CLUSTER  - Use existing cluster instead of creating k3d (default: false)
+
 set -euo pipefail
 
-CLUSTER_NAME="${CLUSTER_NAME:-pgstac-test}"
-NAMESPACE="${NAMESPACE:-test}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INTEGRATION_DIR="$SCRIPT_DIR/integration"
 
-# Cluster
-if ! kubectl cluster-info &>/dev/null; then
-    if command -v k3d &>/dev/null; then
-        echo "Creating k3d cluster..."
-        k3d cluster create "$CLUSTER_NAME" --agents 1 --wait
-    else
-        echo "Error: No Kubernetes cluster found and k3d is not installed" >&2
-        exit 1
+# Parse arguments
+CLEANUP=false
+SKIP_VALIDATION=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --cleanup)
+            CLEANUP=true
+            shift
+            ;;
+        --skip-validation)
+            SKIP_VALIDATION=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --cleanup           Clean up all resources after tests"
+            echo "  --skip-validation   Skip GeoParquet validation step"
+            echo "  -h, --help          Show this help message"
+            echo ""
+            echo "Environment variables:"
+            echo "  CLUSTER_NAME          k3d cluster name (default: pgstac-test)"
+            echo "  NAMESPACE             Kubernetes namespace (default: test)"
+            echo "  USE_EXISTING_CLUSTER  Use existing cluster instead of k3d (default: false)"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Run with --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+# Source common utilities
+source "$INTEGRATION_DIR/common.sh"
+
+# Cleanup function
+cleanup_on_exit() {
+    local exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        echo ""
+        log_error "Integration tests failed (exit code: $exit_code)"
+        echo ""
+        log_info "To debug, resources are still running. You can:"
+        echo "  - Check logs: kubectl logs -n $NAMESPACE <pod-name>"
+        echo "  - Inspect resources: kubectl get all -n $NAMESPACE"
+        echo "  - Clean up: $INTEGRATION_DIR/cleanup.sh --all"
     fi
+
+    if [ "$CLEANUP" = true ]; then
+        echo ""
+        log_info "Running cleanup..."
+        "$INTEGRATION_DIR/cleanup.sh" --all
+    fi
+}
+
+trap cleanup_on_exit EXIT
+
+# Print header
+echo "════════════════════════════════════════════════════════════"
+echo "  pgSTAC GeoParquet Exporter - Integration Tests"
+echo "════════════════════════════════════════════════════════════"
+echo ""
+log_info "Cluster: $CLUSTER_NAME"
+log_info "Namespace: $NAMESPACE"
+echo ""
+
+# Run test phases
+"$INTEGRATION_DIR/00-setup-cluster.sh"
+"$INTEGRATION_DIR/10-deploy-pgstac.sh"
+"$INTEGRATION_DIR/20-deploy-minio.sh"
+"$INTEGRATION_DIR/30-load-test-data.sh"
+"$INTEGRATION_DIR/40-run-export.sh"
+
+if [ "$SKIP_VALIDATION" != true ]; then
+    "$INTEGRATION_DIR/50-validate.sh"
 else
-    echo "Using existing cluster..."
+    log_warning "Skipping GeoParquet validation (--skip-validation)"
 fi
 
-# PGO
-echo "Installing PostgreSQL Operator..."
-helm upgrade --install pgo oci://registry.developers.crunchydata.com/crunchydata/pgo \
-    --version 5.8.0 --wait --timeout 3m
+# Print success summary
+echo ""
+echo "════════════════════════════════════════════════════════════"
+log_success "ALL TESTS PASSED SUCCESSFULLY"
+echo "════════════════════════════════════════════════════════════"
+echo ""
+echo "  ✓ Cluster: $CLUSTER_NAME"
+echo "  ✓ Namespace: $NAMESPACE"
+echo "  ✓ CronJobs deployed"
+echo "  ✓ STAC data loaded (3 items)"
+echo "  ✓ Complete export: SUCCESS"
+if [ "$SKIP_VALIDATION" != true ]; then
+    echo "  ✓ GeoParquet validation: PASSED"
+fi
+echo ""
 
-# Namespace
-kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
-
-# pgSTAC
-echo "Deploying pgSTAC..."
-cat <<EOF | kubectl apply -f -
-apiVersion: postgres-operator.crunchydata.com/v1beta1
-kind: PostgresCluster
-metadata:
-  name: pgstac
-  namespace: $NAMESPACE
-spec:
-  image: registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-15.10-0
-  postgresVersion: 15
-  instances:
-    - name: instance1
-      replicas: 1
-      dataVolumeClaimSpec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 1Gi
-  backups:
-    pgbackrest:
-      repos:
-      - name: repo1
-        volume:
-          volumeClaimSpec:
-            accessModes: ["ReadWriteOnce"]
-            resources:
-              requests:
-                storage: 1Gi
-  users:
-    - name: eoapi
-      databases: ["pgstac"]
-EOF
-
-echo "Waiting for pgSTAC pods..."
-for i in {1..60}; do
-  if kubectl get pod -l postgres-operator.crunchydata.com/cluster=pgstac -n "$NAMESPACE" 2>/dev/null | grep -q pgstac; then
-    break
-  fi
-  sleep 2
-done
-kubectl wait --for=condition=Ready pod -l postgres-operator.crunchydata.com/cluster=pgstac -n "$NAMESPACE" --timeout=3m
-
-# pgSTAC extension
-PGSTAC_POD=$(kubectl get pod -l postgres-operator.crunchydata.com/cluster=pgstac,postgres-operator.crunchydata.com/instance -n "$NAMESPACE" -o jsonpath='{.items[0].metadata.name}')
-echo "Installing extensions..."
-for i in {1..30}; do
-  if kubectl exec -n "$NAMESPACE" "$PGSTAC_POD" -- psql -U eoapi -d pgstac -c \
-    "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS pgstac;" 2>/dev/null; then
-    break
-  fi
-  sleep 2
-done
-
-# MinIO
-echo "Deploying MinIO..."
-kubectl create secret generic minio-secret -n "$NAMESPACE" \
-    --from-literal=accesskey=minioadmin \
-    --from-literal=secretkey=minioadmin \
-    --dry-run=client -o yaml | kubectl apply -f -
-
-cat <<EOF | kubectl apply -f -
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: minio
-  namespace: $NAMESPACE
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: minio
-  template:
-    metadata:
-      labels:
-        app: minio
-    spec:
-      containers:
-      - name: minio
-        image: minio/minio:latest
-        args: ["server", "/data"]
-        env:
-        - name: MINIO_ROOT_USER
-          value: minioadmin
-        - name: MINIO_ROOT_PASSWORD
-          value: minioadmin
-        ports:
-        - containerPort: 9000
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: minio
-  namespace: $NAMESPACE
-spec:
-  ports:
-  - port: 9000
-  selector:
-    app: minio
-EOF
-
-kubectl wait --for=condition=available deployment/minio -n "$NAMESPACE" --timeout=2m
-
-# Deploy chart
-echo "Deploying helm chart..."
-helm upgrade --install exporter charts/pgstac-geoparquet-exporter -n "$NAMESPACE" \
-    --set database.existingSecret=pgstac-pguser-eoapi \
-    --set storage.outputPath=s3://test/geoparquet \
-    --set storage.existingSecret=minio-secret \
-    --set storage.secretKeys.accessKeyId=accesskey \
-    --set storage.secretKeys.secretAccessKey=secretkey \
-    --set storage.endpoint=http://minio:9000 \
-    --set exportConfig.collections[0].name=test-collection \
-    --wait --timeout 2m
-
-# Verify
-echo "Verifying CronJobs..."
-kubectl get cronjobs -n "$NAMESPACE"
-[ "$(kubectl get cronjobs -n "$NAMESPACE" --no-headers | wc -l)" -ge 2 ] || exit 1
-
-echo "✓ Tests passed"
-echo "Cleanup: k3d cluster delete $CLUSTER_NAME"
+if [ "$CLEANUP" != true ]; then
+    log_info "Resources are still running. To clean up:"
+    echo "  $INTEGRATION_DIR/cleanup.sh --all"
+    echo ""
+    echo "Or re-run with: $0 --cleanup"
+fi
