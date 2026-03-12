@@ -25,7 +25,8 @@ helm install exporter ./charts/pgstac-geoparquet-exporter \
   --create-namespace \
   --set database.existingSecret=pgstac-db \
   --set storage.existingSecret=s3-creds \
-  --set storage.outputPath=s3://my-bucket/exports
+  --set storage.outputPath=s3://my-bucket/exports \
+  --set stacApiUrl=https://example.com/stac/v1
 ```
 
 ## Configuration
@@ -33,8 +34,15 @@ helm install exporter ./charts/pgstac-geoparquet-exporter \
 Edit `values.yaml` or create a custom values file:
 
 ```yaml
+# STAC API URL (required for link injection)
+stacApiUrl: "https://example.com/stac/v1"
+
 # Collections to export
 exportConfig:
+  # Export all collections from database (ignores collections list below)
+  exportAll: false
+  
+  # Specify individual collections (or leave empty and set exportAll: true)
   collections:
     - name: sentinel-2
       partition_by: year
@@ -42,29 +50,37 @@ exportConfig:
     - name: landsat-8
       partition_by: null  # Single file
 
-# Schedules
-completeExport:
-  schedule: "0 2 1 * *"  # Monthly
-incrementalExport:
-  schedule: "0 3 * * *"  # Daily
+# Job schedules and resources
+jobs:
+  complete:
+    schedule: "0 2 1 * *"  # Monthly
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "500m"
 
-# Resources
-incrementalExport:
-  resources:
-    requests:
-      memory: "1Gi"
-      cpu: "250m"
+  incremental:
+    schedule: "0 3 * * *"  # Daily
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "250m"
 ```
 
 ## Key Parameters
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `database.existingSecret` | DB credentials secret | `default-pguser-eoapi` |
-| `storage.outputPath` | Output path (s3:// or local) | `s3://eoapi-geoparquet/geoparquet` |
-| `storage.existingSecret` | S3 credentials secret | `data-access` |
-| `completeExport.schedule` | Complete export cron | `"0 2 1 * *"` |
-| `incrementalExport.schedule` | Incremental export cron | `"0 3 * * *"` |
+| `stacApiUrl` | **Required**. STAC API URL for link injection | `""` |
+| `database.existingSecret` | DB credentials secret name | `default-pguser-eoapi` |
+| `storage.outputPath` | Output path (s3:// or local) | `s3://some-bucket/geoparquet` |
+| `storage.existingSecret` | S3 credentials secret name | `""` |
+| `storage.endpoint` | Custom S3 endpoint URL | `""` |
+| `storage.region` | AWS region | `""` |
+| `jobs.complete.schedule` | Complete export cron schedule | `"0 2 1 * *"` |
+| `jobs.incremental.schedule` | Incremental export cron schedule | `"0 3 * * *"` |
+| `exportConfig.exportAll` | Export all collections from database | `false` |
+| `exportConfig.collections[].partition_by` | Partitioning: `null`, `year`, `month` | `year` |
 
 ## Usage
 
@@ -83,3 +99,16 @@ helm upgrade exporter ./charts/pgstac-geoparquet-exporter -n data-access -f valu
 
 - **Complete**: Full export with optional yearly/monthly partitioning
 - **Incremental**: Only changed items since last run (state in `{OUTPUT_PATH}/.last_sync`)
+
+### Export All Collections
+
+Set `exportConfig.exportAll: true` to automatically export all collections from the pgSTAC database instead of manually specifying them. Useful when collections are added dynamically.
+
+## Advanced Options
+
+Additional configuration available in `values.yaml`:
+- `exportConfig.settings` - chunk_size, statement_timeout
+- `jobs` - successfulJobsHistoryLimit, failedJobsHistoryLimit, concurrencyPolicy
+- `extraEnv`, `extraVolumes`, `extraVolumeMounts` - Additional resources
+- `nodeSelector`, `tolerations`, `affinity` - Pod scheduling
+- `podSecurityContext`, `securityContext` - Security settings

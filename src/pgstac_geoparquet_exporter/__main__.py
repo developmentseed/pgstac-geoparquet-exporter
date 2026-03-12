@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any, Callable
 
+import psycopg
 import pyarrow.fs as pafs  # type: ignore
 import yaml
 from stac_geoparquet.pgstac_reader import pgstac_to_parquet, sync_pgstac_to_parquet
@@ -29,6 +30,18 @@ def inject_stac_links(stac_api_url: str) -> Callable[[dict[str, Any]], dict[str,
         return item
 
     return add_links
+
+
+def get_all_collections(conninfo: str) -> list[dict[str, Any]]:
+    """Fetch all collection IDs from pgSTAC database."""
+    conn = psycopg.connect(conninfo)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM pgstac.collections")
+            collection_ids = [row[0] for row in cur.fetchall()]
+            return [{"name": coll_id} for coll_id in collection_ids]
+    finally:
+        conn.close()
 
 
 def main() -> int:
@@ -56,6 +69,19 @@ def main() -> int:
     with open(config_path) as f:
         config = yaml.safe_load(f)
 
+    # Determine which collections to export
+    export_all = config.get("exportAll", False)
+    if export_all:
+        print("Fetching all collections from database...")
+        collections = get_all_collections(conninfo)
+        print(f"Found {len(collections)} collections")
+        # Apply default settings from config
+        default_settings = config.get("exportConfig", {}).get("settings", {})
+        for coll in collections:
+            coll.update(default_settings)
+    else:
+        collections = config.get("collections", [])
+
     # Configure S3 filesystem if using S3/MinIO
     filesystem = None
     if output_base.startswith("s3://"):
@@ -77,7 +103,7 @@ def main() -> int:
 
     if mode == "complete":
         # Complete export
-        for coll in config.get("collections", []):
+        for coll in collections:
             collection_id = coll["name"]
             partition_frequency = coll.get("partition_frequency")
 
@@ -126,7 +152,7 @@ def main() -> int:
         # Incremental mode - export only updated items
         print("Using incremental mode with sync_pgstac_to_parquet")
 
-        for coll in config.get("collections", []):
+        for coll in collections:
             collection_id = coll["name"]
             output_path = f"{output_base}/{collection_id}"
 

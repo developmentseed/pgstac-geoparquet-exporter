@@ -67,10 +67,11 @@ storage:
 
 # Export configuration
 exportConfig:
-  collections:
-    - name: ""
-      partition_by: year  # Options: null, year, month
-      start_year: 2015
+  # Set to true to export all collections from the database
+  # When true, collections list below is ignored
+  exportAll: false
+  
+  collections: []
 
   settings:
     chunk_size: 10000

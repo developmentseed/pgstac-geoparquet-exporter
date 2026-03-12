@@ -11,6 +11,8 @@ metadata:
   {{- end }}
 data:
   export-config.yaml: |
+    exportAll: {{ .Values.exportConfig.exportAll }}
+    
     collections:
     {{- range .Values.exportConfig.collections }}
       - name: {{ .name }}
