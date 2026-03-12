@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.1.3...v0.2.0) (2026-03-12)
+
+
+### Features
+
+* added export all collections. ([b1eaf8e](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/b1eaf8e3e5ce79952b6302ef703b941a6f739dcb))
+
 ## [0.1.3](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.1.2...v0.1.3) (2026-03-12)
 
 
