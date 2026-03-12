@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.1](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.1.0...v0.1.1) (2026-03-12)
+
+
+### Bug Fixes
+
+* docker image push on release. ([a33516d](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/a33516d957cca26d50ba9cef6b272537a02ad1d6))
+
+
+### Tests
+
+* added data and actual export to integration tests. ([46ebce1](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/46ebce15f2ba7d39e09ed3e0137cfdca148de3ae))
+
 ## [0.1.0](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.0.1...v0.1.0) (2026-03-09)
 
 
