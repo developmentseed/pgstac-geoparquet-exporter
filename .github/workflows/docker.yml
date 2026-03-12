@@ -1,6 +1,12 @@
 name: Docker
 
 on:
+  workflow_call:
+    inputs:
+      tag_name:
+        description: 'Tag name for semver tagging (e.g., v0.1.0)'
+        required: false
+        type: string
   push:
     branches: [main]
     tags:
@@ -22,6 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.tag_name || github.ref }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -41,6 +48,9 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=develop,enable={{is_default_branch}}
             type=ref,event=branch
+            type=semver,pattern={{version}},value=${{ inputs.tag_name }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag_name }}
+            type=semver,pattern={{major}},value=${{ inputs.tag_name }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
@@ -51,6 +61,7 @@ jobs:
           echo "Event name: ${{ github.event_name }}"
           echo "Ref: ${{ github.ref }}"
           echo "Ref name: ${{ github.ref_name }}"
+          echo "Input tag: ${{ inputs.tag_name }}"
           echo "Tags: ${{ steps.meta.outputs.tags }}"
           echo "Labels: ${{ steps.meta.outputs.labels }}"
 
