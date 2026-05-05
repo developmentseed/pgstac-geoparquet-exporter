@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.2.3...v0.2.4) (2026-05-05)
+
+
+### Bug Fixes
+
+* incremental export dir structure. ([#21](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/21)) ([f4513d4](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/f4513d4c964947beea95e8088ce5a839d48a57e1))
+
 ## [0.2.3](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.2.2...v0.2.3) (2026-05-05)
 
 
