@@ -33,6 +33,8 @@ def validate_parquet_files(
     secret_key: str = "minioadmin",
     endpoint_url: str = "http://localhost:9000",
     expected_rows: Optional[int] = None,
+    exact_rows: bool = False,
+    expected_files: Optional[int] = None,
 ) -> bool:
     """
     Validate GeoParquet files in S3 bucket.
@@ -43,6 +45,8 @@ def validate_parquet_files(
         secret_key: S3 secret key
         endpoint_url: S3 endpoint URL
         expected_rows: Expected number of rows (None to skip check)
+        exact_rows: Require exact row count instead of minimum
+        expected_files: Expected number of parquet files
 
     Returns:
         True if validation passes, False otherwise
@@ -77,8 +81,14 @@ def validate_parquet_files(
             print(f"WARNING: No .parquet files found among {len(files)} files")
             return False
 
+        if expected_files is not None and len(parquet_files) != expected_files:
+            print(
+                f"ERROR: Expected {expected_files} parquet files, found {len(parquet_files)}"
+            )
+            return False
+
         for file_path in parquet_files:
-            if not validate_single_file(fs, file_path, expected_rows):
+            if not validate_single_file(fs, file_path, expected_rows, exact_rows):
                 return False
 
         print(f"\n✓ All {len(parquet_files)} GeoParquet files validated successfully")
@@ -95,6 +105,7 @@ def validate_single_file(
     fs: s3fs.S3FileSystem,
     file_path: str,
     expected_rows: Optional[int] = None,
+    exact_rows: bool = False,
 ) -> bool:
     """
     Validate a single GeoParquet file.
@@ -103,6 +114,7 @@ def validate_single_file(
         fs: S3 filesystem instance
         file_path: Path to the parquet file
         expected_rows: Expected number of rows (None to skip check)
+        exact_rows: Require exact row count instead of minimum
 
     Returns:
         True if validation passes, False otherwise
@@ -126,11 +138,20 @@ def validate_single_file(
 
     # Validate row count if specified
     if expected_rows is not None:
-        if table.num_rows < expected_rows:
-            print(f"ERROR: Expected at least {expected_rows} rows, found {table.num_rows}")
-            return False
-        elif table.num_rows > expected_rows:
-            print(f"WARNING: Expected {expected_rows} rows, found {table.num_rows} (may include duplicates)")
+        if exact_rows:
+            if table.num_rows != expected_rows:
+                print(f"ERROR: Expected exactly {expected_rows} rows, found {table.num_rows}")
+                return False
+        else:
+            if table.num_rows < expected_rows:
+                print(
+                    f"ERROR: Expected at least {expected_rows} rows, found {table.num_rows}"
+                )
+                return False
+            elif table.num_rows > expected_rows:
+                print(
+                    f"WARNING: Expected {expected_rows} rows, found {table.num_rows} (may include duplicates)"
+                )
 
     # Validate required STAC fields
     # Note: The 'properties' column is not strictly required in the newer format
@@ -193,8 +214,20 @@ def main():
         type=int,
         help="Expected number of rows in parquet files",
     )
+    parser.add_argument(
+        "--exact-rows",
+        action="store_true",
+        help="Require exact row count (--expected-rows must also be set)",
+    )
+    parser.add_argument(
+        "--expected-files",
+        type=int,
+        help="Expected number of parquet files",
+    )
 
     args = parser.parse_args()
+    if args.exact_rows and args.expected_rows is None:
+        parser.error("--exact-rows requires --expected-rows")
 
     success = validate_parquet_files(
         bucket_path=args.bucket_path,
@@ -202,6 +235,8 @@ def main():
         secret_key=args.secret_key,
         endpoint_url=args.endpoint,
         expected_rows=args.expected_rows,
+        exact_rows=args.exact_rows,
+        expected_files=args.expected_files,
     )
 
     sys.exit(0 if success else 1)

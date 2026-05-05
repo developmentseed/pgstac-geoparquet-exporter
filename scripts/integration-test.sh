@@ -113,6 +113,7 @@ echo "  ✓ Namespace: $NAMESPACE"
 echo "  ✓ CronJobs deployed"
 echo "  ✓ STAC data loaded (3 items)"
 echo "  ✓ Complete export: SUCCESS"
+echo "  ✓ Incremental export: SUCCESS"
 if [ "$SKIP_VALIDATION" != true ]; then
     echo "  ✓ GeoParquet validation: PASSED"
 fi

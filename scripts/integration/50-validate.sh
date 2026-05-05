@@ -35,14 +35,27 @@ if ! uv pip install --quiet pyarrow s3fs 2>/dev/null; then
     exit 0
 fi
 
-# Run validation
-log_info "Running GeoParquet validation"
+# Run complete export validation
+log_info "Running complete export validation"
 if ! python3 "$SCRIPT_DIR/../validate_parquet.py" \
     test/geoparquet/test-collection \
     --expected-rows 3; then
     cleanup_port_forward
     trap - EXIT
-    log_error "GeoParquet validation failed"
+    log_error "Complete GeoParquet validation failed"
+    exit 1
+fi
+
+# Run incremental export validation
+log_info "Running incremental export validation"
+if ! python3 "$SCRIPT_DIR/../validate_parquet.py" \
+    test/geoparquet/test-collection/updates \
+    --expected-rows 1 \
+    --exact-rows \
+    --expected-files 1; then
+    cleanup_port_forward
+    trap - EXIT
+    log_error "Incremental GeoParquet validation failed"
     exit 1
 fi
 
