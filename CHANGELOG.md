@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.2.1](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.2.0...v0.2.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* resolve mypy type checking errors. ([8d554a1](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/8d554a19ed51edb46cbdce0311e3da604469a986))
+
+
+### Chores
+
+* **deps:** bump actions/checkout from 4.3.1 to 6.0.2 ([#12](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/12)) ([665161f](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/665161f81b9137eabd66c5adf61a31313db65f9a))
+* **deps:** bump astral-sh/setup-uv from 5 to 7 ([#13](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/13)) ([d146379](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/d146379b133fd3bc77eba0ddd44f514838b8c96a))
+* **deps:** bump azure/setup-helm from 4.3.1 to 5.0.0 ([#9](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/9)) ([691f787](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/691f787c8e9e7f5c8345cf47eb4f8d2cffb85598))
+* **deps:** bump docker/build-push-action from 5.4.0 to 7.1.0 ([#11](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/11)) ([6c180a8](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/6c180a8fb4cb7462c6b3be7fd84046cd15068581))
+* **deps:** bump docker/login-action from 3.7.0 to 4.1.0 ([#14](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/14)) ([0c75ab2](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/0c75ab21701158797f5f4b327004854b5695c41a))
+* **deps:** bump docker/metadata-action from 5.10.0 to 6.0.0 ([#10](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/10)) ([4a80cf5](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/4a80cf5d1d8a98d4f2bdf880ef3ddb157c8debec))
+* upgraded python dependencies. ([91d18f9](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/91d18f9ef94613a4259922f0704a2b1ef46e51ad))
+
+
+### CI/CD
+
+* add Dependabot for GitHub Actions version updates ([#7](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/7)) ([0285a3a](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/0285a3a44d17bdcb5e39f8c916da04391715f95c))
+* pin GitHub Actions to SHA digests ([#6](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/6)) ([bc4bf89](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/bc4bf89f4246e278ada00064a1c49f32202938df))
+
 ## [0.2.0](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.1.3...v0.2.0) (2026-03-12)
 
 
