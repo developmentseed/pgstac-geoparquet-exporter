@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.2](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.2.1...v0.2.2) (2026-05-05)
+
+
+### Bug Fixes
+
+* consistant use of uv. ([d140097](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/d140097838122299df53ae58984c8c1a539606b0))
+* handling for empty collections. ([#15](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/15)) ([5493933](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/5493933aef5b41b2b4b31543e7d50363b12918a8))
+* python dependencies for dependabot. ([73d595a](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/73d595ad21a2aee998efc2093f0ab313c050122e))
+
+
+### Chores
+
+* **deps:** bump googleapis/release-please-action from 4.4.0 to 5.0.0 ([#18](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/18)) ([3cba6c6](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/3cba6c6f02bba5182e9b68655bcd7b1b1a9dbb2b))
+
 ## [0.2.1](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.2.0...v0.2.1) (2026-05-05)
 
 
