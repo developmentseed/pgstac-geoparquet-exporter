@@ -11,7 +11,7 @@ Export STAC collections from pgSTAC to GeoParquet format with support for comple
 ## Installation
 
 ```bash
-pip install -e .
+uv pip install -e .
 ```
 
 ## Usage

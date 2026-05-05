@@ -23,7 +23,7 @@ try:
     import s3fs
 except ImportError:
     print("ERROR: Required dependencies not installed")
-    print("Please install: pip install pyarrow s3fs")
+    print("Please install: uv pip install pyarrow s3fs")
     sys.exit(1)
 
 

@@ -27,7 +27,7 @@ sleep 3
 
 # Install validation dependencies
 log_info "Installing Python validation dependencies"
-if ! python3 -m pip install --quiet pyarrow s3fs 2>/dev/null; then
+if ! uv pip install --quiet pyarrow s3fs 2>/dev/null; then
     log_warning "Could not install validation dependencies, skipping parquet validation"
     cleanup_port_forward
     trap - EXIT

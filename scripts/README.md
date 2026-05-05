@@ -13,7 +13,7 @@ End-to-end integration test validating the complete export pipeline from pgSTAC 
 CLUSTER_NAME=my-cluster NAMESPACE=my-ns ./scripts/integration-test.sh
 ```
 
-**Requirements**: kubectl, helm, python3 (pip). k3d auto-installed if no cluster exists.
+**Requirements**: kubectl, helm, python3, uv. k3d auto-installed if no cluster exists.
 
 ### What It Tests
 
