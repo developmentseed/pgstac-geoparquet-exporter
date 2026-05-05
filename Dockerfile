@@ -14,17 +14,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
+# Install uv
+RUN pip install --no-cache-dir uv
+
 # Copy project files
 COPY --chown=user:user pyproject.toml .
 COPY --chown=user:user src/ src/
 
-# Install uv
-RUN pip install --no-cache-dir uv
+# Install dependencies with uv (as root)
+RUN uv pip install --system --no-cache -e .
 
 # Switch to non-root user
 USER user
-
-# Install dependencies with uv
-RUN uv pip install --no-cache -e .
 
 ENTRYPOINT ["python", "-m", "pgstac_geoparquet_exporter"]
