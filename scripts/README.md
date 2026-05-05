@@ -19,8 +19,8 @@ CLUSTER_NAME=my-cluster NAMESPACE=my-ns ./scripts/integration-test.sh
 
 1. **Infrastructure**: k3d cluster, PostgreSQL Operator, pgSTAC, MinIO, Helm chart
 2. **Data Loading**: Creates test collection + 3 STAC items via pypgstac
-3. **Export Jobs**: Triggers complete export (and incremental - expected to fail)
-4. **Validation**: Reads GeoParquet files with PyArrow, validates schema and row count
+3. **Export Jobs**: Triggers complete and incremental export jobs (both expected to succeed)
+4. **Validation**: Reads GeoParquet files with PyArrow and validates complete + incremental outputs
 
 ### Expected Output
 
@@ -30,6 +30,7 @@ CLUSTER_NAME=my-cluster NAMESPACE=my-ns ./scripts/integration-test.sh
   ✓ CronJobs created: 2
   ✓ STAC items loaded: 3
   ✓ Complete export: SUCCESS
+  ✓ Incremental export: SUCCESS
   ✓ Geoparquet validation: PASSED
 ════════════════════════════════════════════════════════════
 ```

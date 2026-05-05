@@ -4,10 +4,11 @@
 import logging
 import os
 import sys
+import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable
 
 import psycopg
 import pyarrow.fs as pafs
@@ -63,81 +64,52 @@ def get_all_collections(conninfo: str) -> list[dict[str, Any]]:
         conn.close()
 
 
-def sync_collection_to_parquet(
+def build_incremental_output_file(output_path: str, dataset_dirname: str) -> str:
+    """Return unique incremental parquet file path in dataset directory."""
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    run_id = uuid.uuid4().hex[:8]
+    filename = f"{timestamp}_{run_id}.parquet"
+    base_path = output_path.rstrip("/")
+    normalized_dirname = dataset_dirname.strip("/") or "updates"
+    return f"{base_path}/{normalized_dirname}/{filename}"
+
+
+def export_incremental_with_updated_after(
     conninfo: str,
-    collection: str,
-    output_path: Union[str, Path],
-    updated_after: Union[datetime, None] = None,
-    chunk_size: int = 8192,
-    row_func: Union[Callable[[Any], Any], None] = None,
-    filesystem: Optional[Any] = None,
-    **kwargs: Any,
-) -> None:
-    """
-    Sync a single collection to parquet, filtering partitions by collection.
+    collection_id: str,
+    output_path: str,
+    dataset_dirname: str,
+    updated_after: datetime,
+    chunk_size: int,
+    row_func: Callable[[dict[str, Any]], dict[str, Any]],
+    filesystem: Any | None,
+) -> int:
+    """Export filtered partition windows for one collection."""
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    run_id = uuid.uuid4().hex[:8]
+    exported = 0
 
-    This is a wrapper around sync_pgstac_to_parquet that ensures only partitions
-    for the specified collection are exported. This prevents cross-collection
-    contamination in incremental mode.
-
-    Args:
-        conninfo: PostgreSQL connection string
-        collection: Collection ID to sync
-        output_path: Base output path (collection will NOT be added as subdirectory)
-        updated_after: Only sync partitions updated after this timestamp
-        chunk_size: Number of items to process per chunk
-        row_func: Optional function to transform each row
-        filesystem: Optional filesystem to use for output
-        **kwargs: Additional arguments passed to pgstac_to_parquet
-    """
-    if filesystem is None:
-        filesystem_obj, filepath = pafs.FileSystem.from_uri(str(output_path))  # type: ignore[attr-defined]
-    else:
-        filesystem_obj = filesystem
-        filepath = str(output_path)
-
-    filedir = Path(filepath)
-    filesystem_obj.create_dir(str(filedir), recursive=True)
-
-    logger.debug(
-        f"Syncing collection {collection} to {output_path} (updated_after={updated_after})"
-    )
-
-    # Get all partitions and filter by collection
-    partitions_found = 0
     for partition in get_pgstac_partitions(conninfo, updated_after):
-        if partition.collection != collection:
-            # Skip partitions from other collections
-            logger.debug(
-                f"Skipping partition for collection {partition.collection} "
-                f"(looking for {collection})"
-            )
+        if partition.collection != collection_id:
             continue
-
-        partitions_found += 1
-        output_file = filedir / partition.partition
-        logger.debug(
-            f"Syncing partition {partition.partition} for collection {collection} "
-            f"to {output_file}"
+        partition_name = (
+            Path(partition.partition).name or f"partition-{exported}.parquet"
         )
-
+        output_file = (
+            f"{output_path}/{dataset_dirname}/{timestamp}_{run_id}_{partition_name}"
+        )
         pgstac_to_parquet(
             conninfo=conninfo,
-            output_path=str(output_file),
-            collection=partition.collection,
+            output_path=output_file,
+            collection=collection_id,
             start_datetime=partition.start,
             end_datetime=partition.end,
             chunk_size=chunk_size,
             row_func=row_func,
             filesystem=filesystem,
-            **kwargs,
         )
-
-    if partitions_found == 0:
-        logger.info(
-            f"No partitions found for collection {collection} "
-            f"(updated_after={updated_after})"
-        )
+        exported += 1
+    return exported
 
 
 def main() -> int:
@@ -231,8 +203,9 @@ def main() -> int:
                         filesystem=filesystem,
                     )
                 else:
-                    # Single file export
-                    output_file = f"{output_path}/items.parquet"
+                    # Single file export - write to configurable filename (default: full.parquet)
+                    filename = coll.get("complete_filename", "full.parquet")
+                    output_file = f"{output_path}/{filename}"
 
                     # Check if file exists and skip if rewrite=False
                     if Path(output_file).exists() and not coll.get("rewrite", False):
@@ -263,8 +236,8 @@ def main() -> int:
                 stats.failed_collections += 1
 
     elif mode == "incremental":
-        # Incremental mode - export only updated items
-        logger.info("Using incremental mode with collection-scoped sync")
+        # Incremental mode - export only updated items to a delta parquet file.
+        logger.info("Using incremental mode")
 
         for coll in collections:
             collection_id = coll["name"]
@@ -278,23 +251,52 @@ def main() -> int:
             # Get last update timestamp if available
             updated_after = coll.get("updated_after")  # Should be datetime or None
 
-            try:
-                logger.info(f"Syncing collection: {collection_id}")
-                sync_collection_to_parquet(
-                    conninfo=conninfo,
-                    collection=collection_id,
-                    output_path=output_path,
-                    updated_after=updated_after,
-                    chunk_size=coll.get("chunk_size", 8192),
-                    row_func=row_func,
-                    filesystem=filesystem,
+            # Write incremental updates as per-run files in a dataset directory.
+            # Default layout: {collection}/updates/{timestamp}_{runid}.parquet
+            dataset_dirname = coll.get("incremental_dirname", "updates")
+            normalized_dirname = dataset_dirname.strip("/") or "updates"
+            if filesystem is None:
+                Path(f"{output_path}/{normalized_dirname}").mkdir(
+                    parents=True, exist_ok=True
                 )
-                logger.info(f"Synced {collection_id}")
+            try:
+                logger.info(
+                    f"Exporting incremental updates for collection: {collection_id}"
+                )
+                if updated_after is None:
+                    output_file = build_incremental_output_file(
+                        output_path, normalized_dirname
+                    )
+                    pgstac_to_parquet(
+                        conninfo=conninfo,
+                        output_path=output_file,
+                        collection=collection_id,
+                        chunk_size=coll.get("chunk_size", 8192),
+                        row_func=row_func,
+                        filesystem=filesystem,
+                    )
+                    logger.info(
+                        f"Exported incremental updates for {collection_id} to {output_file}"
+                    )
+                else:
+                    exported_count = export_incremental_with_updated_after(
+                        conninfo=conninfo,
+                        collection_id=collection_id,
+                        output_path=output_path,
+                        dataset_dirname=normalized_dirname,
+                        updated_after=updated_after,
+                        chunk_size=coll.get("chunk_size", 8192),
+                        row_func=row_func,
+                        filesystem=filesystem,
+                    )
+                    if exported_count == 0:
+                        raise StopIteration
+                    logger.info(
+                        f"Exported {exported_count} incremental partition file(s) for {collection_id}"
+                    )
                 stats.exported_successfully += 1
             except StopIteration:
-                logger.warning(
-                    f"Skipping collection {collection_id}: no exportable items"
-                )
+                logger.warning(f"Skipping collection {collection_id}: no updated items")
                 stats.skipped_empty += 1
             except Exception as e:
                 logger.error(f"Failed to export collection {collection_id}: {e}")

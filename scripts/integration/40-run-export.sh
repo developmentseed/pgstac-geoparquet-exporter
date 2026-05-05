@@ -36,6 +36,7 @@ helm upgrade --install exporter charts/pgstac-geoparquet-exporter -n "$NAMESPACE
     --set stacApiUrl=http://localhost \
     --set exportConfig.collections[0].name=test-collection \
     --set exportConfig.collections[0].partition_by=null \
+    --set exportConfig.collections[0].updated_after=2022-01-01T00:00:00Z \
     --wait --timeout 2m
 
 log_success "Helm chart deployed"
@@ -81,11 +82,17 @@ kubectl create job test-incremental-export -n "$NAMESPACE" \
     --from=cronjob/exporter-pgstac-geoparquet-exporter-incremental
 
 log_info "Waiting for incremental export job to finish"
-if kubectl wait --for=condition=complete job/test-incremental-export -n "$NAMESPACE" --timeout=5m 2>/dev/null; then
-    log_success "Incremental export job completed (unexpected success)"
-else
-    log_warning "Incremental export job failed (expected - mode not fully implemented)"
+if ! kubectl wait --for=condition=complete job/test-incremental-export -n "$NAMESPACE" --timeout=5m 2>/dev/null; then
+    log_error "Incremental export job failed or timed out"
+    echo "Job status:"
+    kubectl get job/test-incremental-export -n "$NAMESPACE" || true
+    echo ""
+    echo "Job logs:"
+    kubectl logs -n "$NAMESPACE" job/test-incremental-export --tail=50 || true
+    exit 1
 fi
+
+log_success "Incremental export job finished successfully"
 
 # Cleanup incremental export job
 kubectl delete job test-incremental-export -n "$NAMESPACE" --ignore-not-found=true

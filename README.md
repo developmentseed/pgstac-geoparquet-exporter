@@ -46,7 +46,21 @@ collections:
     start_year: 2015
   - name: landsat
     partition_by: null  # Single file
+    complete_filename: baseline.parquet  # Optional, defaults to "full.parquet"
+    incremental_dirname: delta  # Optional, defaults to "updates" (directory)
 ```
+
+### Configuration Options
+
+Per-collection settings:
+
+- `name`: Collection ID (required)
+- `partition_frequency`: Partition by time (`YS` for yearly, `MS` for monthly, etc.)
+- `chunk_size`: Number of items per chunk (default: 8192)
+- `rewrite`: Whether to overwrite existing files (default: false)
+- `updated_after`: Datetime filter for incremental exports
+- `complete_filename`: Filename for non-partitioned complete exports (default: `full.parquet`)
+- `incremental_dirname`: Directory name for incremental run files (default: `updates`)
 
 ## Docker
 
@@ -72,6 +86,36 @@ docker run --rm \
 
 ## Export Modes
 
-**Complete**: Exports entire collections. With yearly partitioning, creates separate files per year.
+### Complete Mode
 
-**Incremental**: Tracks last sync time and exports only updated items. State stored in `{OUTPUT_PATH}/.last_sync`.
+Exports entire collections to `{collection-name}/full.parquet`. This creates a baseline snapshot of all items in the collection.
+
+- For collections without partitioning: Single `full.parquet` file
+- For collections with yearly partitioning: Separate files per year (partition files)
+
+### Incremental Mode
+
+Exports only changed items since the last update to `{collection-name}/updates/` (or your configured `incremental_dirname` directory). Each run writes new parquet output:
+
+- Default (no `updated_after`): `{timestamp}_{runid}.parquet`
+- With `updated_after`: one file per matching partition window, `{timestamp}_{runid}_{partition}.parquet`
+- Examples: `updates/20260505T142300Z_deadbeef.parquet`, `updates/20260505T142300Z_deadbeef_items_202401.parquet`
+
+**Typical Workflow:**
+
+1. Generate monthly baseline: `EXPORT_MODE=complete` → creates `{collection}/full.parquet`
+2. Daily/weekly updates: `EXPORT_MODE=incremental` → writes new files in `{collection}/updates/`
+3. Monthly refresh: Regenerate `full.parquet`, then archive or clear old files from `updates/`
+
+**Custom Filenames Example:**
+
+```yaml
+collections:
+  - name: sentinel-2
+    complete_filename: baseline.parquet
+    incremental_dirname: delta
+```
+
+This creates `sentinel-2/baseline.parquet` (complete) and per-run incremental files under `sentinel-2/delta/`.
+
+**Note:** Use the `updated_after` parameter in your collection configuration to control which items are considered "updated".
