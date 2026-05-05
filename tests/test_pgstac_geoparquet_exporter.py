@@ -1,6 +1,7 @@
 import os
 import sys
-from unittest.mock import Mock, patch, mock_open
+from datetime import datetime, timezone
+from unittest.mock import Mock, patch, mock_open, MagicMock
 
 import pytest
 
@@ -8,7 +9,11 @@ import pytest
 sys.modules["stac_geoparquet"] = Mock()
 sys.modules["stac_geoparquet.pgstac_reader"] = Mock()
 
-from pgstac_geoparquet_exporter.__main__ import inject_stac_links, main  # noqa: E402
+from pgstac_geoparquet_exporter.__main__ import (  # noqa: E402
+    inject_stac_links,
+    main,
+    sync_collection_to_parquet,
+)
 
 
 @pytest.fixture
@@ -280,7 +285,7 @@ def test_monthly_partition_frequency(mock_file, mock_mkdir, mock_sync, base_env)
     mock_sync.assert_called_once()
 
 
-@patch("pgstac_geoparquet_exporter.__main__.sync_pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.sync_collection_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch(
     "builtins.open",
@@ -288,7 +293,7 @@ def test_monthly_partition_frequency(mock_file, mock_mkdir, mock_sync, base_env)
     read_data="collections:\n  - name: test\n",
 )
 def test_incremental_mode_with_collection(mock_file, mock_mkdir, mock_sync, base_env):
-    """Verify incremental mode calls sync_pgstac_to_parquet"""
+    """Verify incremental mode calls sync_collection_to_parquet"""
     base_env["EXPORT_MODE"] = "incremental"
 
     with patch.dict(os.environ, base_env, clear=True):
@@ -297,6 +302,7 @@ def test_incremental_mode_with_collection(mock_file, mock_mkdir, mock_sync, base
     assert result == 0
     mock_sync.assert_called_once()
     call_kwargs = mock_sync.call_args[1]
+    assert call_kwargs["collection"] == "test"
     assert call_kwargs["output_path"] == "/output/test"
     assert call_kwargs["updated_after"] is None
 
@@ -541,7 +547,7 @@ def test_empty_partitioned_collection_does_not_crash(
     mock_sync.assert_called_once()
 
 
-@patch("pgstac_geoparquet_exporter.__main__.sync_pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.sync_collection_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch(
     "builtins.open",
@@ -592,3 +598,215 @@ def test_skipped_file_not_counted_as_failure(
     assert "Skipped (existing): 1" in log_text
     assert "Skipped (empty): 0" in log_text
     assert "Failed: 0" in log_text
+
+
+# Tests for cross-collection bug fix
+
+
+@patch("pgstac_geoparquet_exporter.__main__.get_pgstac_partitions")
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+def test_sync_collection_filters_partitions_by_collection(
+    mock_to_parquet, mock_get_partitions
+):
+    """Verify sync_collection_to_parquet only processes partitions for the requested collection"""
+    from pgstac_geoparquet_exporter.__main__ import sync_collection_to_parquet
+
+    # Create mock Partition objects
+    mock_partition_a = MagicMock()
+    mock_partition_a.collection = "collection-a"
+    mock_partition_a.partition = "items.parquet"
+    mock_partition_a.start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    mock_partition_a.end = datetime(2024, 12, 31, tzinfo=timezone.utc)
+
+    mock_partition_b = MagicMock()
+    mock_partition_b.collection = "collection-b"
+    mock_partition_b.partition = "items.parquet"
+    mock_partition_b.start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    mock_partition_b.end = datetime(2024, 12, 31, tzinfo=timezone.utc)
+
+    # get_pgstac_partitions returns partitions from both collections
+    mock_get_partitions.return_value = [mock_partition_a, mock_partition_b]
+
+    # Create mock filesystem
+    mock_filesystem = MagicMock()
+    mock_filesystem.create_dir = MagicMock()
+
+    # Sync only collection-a
+    sync_collection_to_parquet(
+        conninfo="host=test",
+        collection="collection-a",
+        output_path="/output/collection-a",
+        filesystem=mock_filesystem,
+    )
+
+    # Verify only collection-a partition was exported
+    assert mock_to_parquet.call_count == 1
+    call_kwargs = mock_to_parquet.call_args[1]
+    assert call_kwargs["collection"] == "collection-a"
+
+
+@patch("pgstac_geoparquet_exporter.__main__.sync_collection_to_parquet")
+@patch("pathlib.Path.mkdir")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: collection-a\n  - name: collection-b\n",
+)
+def test_incremental_mode_multiple_collections_isolated(
+    mock_file, mock_mkdir, mock_sync, base_env
+):
+    """Verify incremental mode calls sync_collection_to_parquet separately for each collection"""
+    base_env["EXPORT_MODE"] = "incremental"
+
+    with patch.dict(os.environ, base_env, clear=True):
+        result = main()
+
+    assert result == 0
+    assert mock_sync.call_count == 2
+
+    # Verify each collection was synced with its own collection parameter
+    calls = mock_sync.call_args_list
+    call_collections = [call[1]["collection"] for call in calls]
+    assert "collection-a" in call_collections
+    assert "collection-b" in call_collections
+
+    # Verify output paths are correct
+    call_paths = [call[1]["output_path"] for call in calls]
+    assert "/output/collection-a" in call_paths
+    assert "/output/collection-b" in call_paths
+
+
+@patch("pgstac_geoparquet_exporter.__main__.get_pgstac_partitions")
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+def test_sync_collection_handles_empty_collection(mock_to_parquet, mock_get_partitions):
+    """Verify sync_collection_to_parquet handles empty collections gracefully"""
+    # No partitions for the requested collection
+    mock_partition_other = MagicMock()
+    mock_partition_other.collection = "other-collection"
+    mock_get_partitions.return_value = [mock_partition_other]
+
+    # Create mock filesystem
+    mock_filesystem = MagicMock()
+    mock_filesystem.create_dir = MagicMock()
+
+    # Should complete without error
+    sync_collection_to_parquet(
+        conninfo="host=test",
+        collection="empty-collection",
+        output_path="/output/empty-collection",
+        filesystem=mock_filesystem,
+    )
+
+    # Verify pgstac_to_parquet was never called
+    assert mock_to_parquet.call_count == 0
+
+
+@patch("pgstac_geoparquet_exporter.__main__.get_pgstac_partitions")
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+def test_sync_collection_multiple_partitions_same_collection(
+    mock_to_parquet, mock_get_partitions
+):
+    """Verify sync_collection_to_parquet handles multiple partitions from same collection"""
+    # Create two partitions for collection-a
+    mock_partition_1 = MagicMock()
+    mock_partition_1.collection = "collection-a"
+    mock_partition_1.partition = "items_20240101_20240630.parquet"
+    mock_partition_1.start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    mock_partition_1.end = datetime(2024, 6, 30, tzinfo=timezone.utc)
+
+    mock_partition_2 = MagicMock()
+    mock_partition_2.collection = "collection-a"
+    mock_partition_2.partition = "items_20240701_20241231.parquet"
+    mock_partition_2.start = datetime(2024, 7, 1, tzinfo=timezone.utc)
+    mock_partition_2.end = datetime(2024, 12, 31, tzinfo=timezone.utc)
+
+    mock_get_partitions.return_value = [mock_partition_1, mock_partition_2]
+
+    # Create mock filesystem
+    mock_filesystem = MagicMock()
+    mock_filesystem.create_dir = MagicMock()
+
+    sync_collection_to_parquet(
+        conninfo="host=test",
+        collection="collection-a",
+        output_path="/output/collection-a",
+        filesystem=mock_filesystem,
+    )
+
+    # Verify both partitions were exported
+    assert mock_to_parquet.call_count == 2
+
+    # Verify both calls are for collection-a
+    for call in mock_to_parquet.call_args_list:
+        assert call[1]["collection"] == "collection-a"
+
+
+@patch("pgstac_geoparquet_exporter.__main__.sync_collection_to_parquet")
+@patch("pathlib.Path.mkdir")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: noaa-emergency-response\n  - name: sentinel-2-iceland\n  - name: eric.test\n  - name: eric.test2\n",
+)
+def test_incremental_mode_regression_cross_collection_isolation(
+    mock_file, mock_mkdir, mock_sync, base_env
+):
+    """
+    Regression test for cross-collection contamination bug.
+
+    Bug: When syncing collection X in incremental mode, files were written to
+    .../geoparquet/X/Y/items.parquet where Y is a different collection.
+
+    This test verifies that each collection is synced independently with proper
+    collection filtering.
+    """
+    base_env["EXPORT_MODE"] = "incremental"
+
+    with patch.dict(os.environ, base_env, clear=True):
+        result = main()
+
+    assert result == 0
+    assert mock_sync.call_count == 4
+
+    # Verify each sync call has matching collection and output path
+    calls = mock_sync.call_args_list
+    for call in calls:
+        collection = call[1]["collection"]
+        output_path = call[1]["output_path"]
+
+        # Output path should end with the collection name
+        assert output_path.endswith(
+            collection
+        ), f"Output path {output_path} does not match collection {collection}"
+
+        # Verify collection parameter is passed
+        assert "collection" in call[1]
+
+
+@patch("pgstac_geoparquet_exporter.__main__.get_pgstac_partitions")
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+def test_sync_collection_updated_after_filter(mock_to_parquet, mock_get_partitions):
+    """Verify sync_collection_to_parquet respects updated_after parameter"""
+    mock_partition = MagicMock()
+    mock_partition.collection = "test-collection"
+    mock_partition.partition = "items.parquet"
+    mock_partition.start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    mock_partition.end = datetime(2024, 12, 31, tzinfo=timezone.utc)
+    mock_get_partitions.return_value = [mock_partition]
+
+    updated_after = datetime(2024, 6, 1, tzinfo=timezone.utc)
+
+    # Create mock filesystem
+    mock_filesystem = MagicMock()
+    mock_filesystem.create_dir = MagicMock()
+
+    sync_collection_to_parquet(
+        conninfo="host=test",
+        collection="test-collection",
+        output_path="/output/test-collection",
+        updated_after=updated_after,
+        filesystem=mock_filesystem,
+    )
+
+    # Verify get_pgstac_partitions was called with updated_after
+    mock_get_partitions.assert_called_once_with("host=test", updated_after)

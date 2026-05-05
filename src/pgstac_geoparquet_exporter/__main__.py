@@ -5,13 +5,18 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Optional, Union
 
 import psycopg
 import pyarrow.fs as pafs
 import yaml
-from stac_geoparquet.pgstac_reader import pgstac_to_parquet, sync_pgstac_to_parquet
+from stac_geoparquet.pgstac_reader import (
+    get_pgstac_partitions,
+    pgstac_to_parquet,
+    sync_pgstac_to_parquet,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -56,6 +61,83 @@ def get_all_collections(conninfo: str) -> list[dict[str, Any]]:
             return [{"name": coll_id} for coll_id in collection_ids]
     finally:
         conn.close()
+
+
+def sync_collection_to_parquet(
+    conninfo: str,
+    collection: str,
+    output_path: Union[str, Path],
+    updated_after: Union[datetime, None] = None,
+    chunk_size: int = 8192,
+    row_func: Union[Callable[[Any], Any], None] = None,
+    filesystem: Optional[Any] = None,
+    **kwargs: Any,
+) -> None:
+    """
+    Sync a single collection to parquet, filtering partitions by collection.
+
+    This is a wrapper around sync_pgstac_to_parquet that ensures only partitions
+    for the specified collection are exported. This prevents cross-collection
+    contamination in incremental mode.
+
+    Args:
+        conninfo: PostgreSQL connection string
+        collection: Collection ID to sync
+        output_path: Base output path (collection will NOT be added as subdirectory)
+        updated_after: Only sync partitions updated after this timestamp
+        chunk_size: Number of items to process per chunk
+        row_func: Optional function to transform each row
+        filesystem: Optional filesystem to use for output
+        **kwargs: Additional arguments passed to pgstac_to_parquet
+    """
+    if filesystem is None:
+        filesystem_obj, filepath = pafs.FileSystem.from_uri(str(output_path))  # type: ignore[attr-defined]
+    else:
+        filesystem_obj = filesystem
+        filepath = str(output_path)
+
+    filedir = Path(filepath)
+    filesystem_obj.create_dir(str(filedir), recursive=True)
+
+    logger.debug(
+        f"Syncing collection {collection} to {output_path} (updated_after={updated_after})"
+    )
+
+    # Get all partitions and filter by collection
+    partitions_found = 0
+    for partition in get_pgstac_partitions(conninfo, updated_after):
+        if partition.collection != collection:
+            # Skip partitions from other collections
+            logger.debug(
+                f"Skipping partition for collection {partition.collection} "
+                f"(looking for {collection})"
+            )
+            continue
+
+        partitions_found += 1
+        output_file = filedir / partition.partition
+        logger.debug(
+            f"Syncing partition {partition.partition} for collection {collection} "
+            f"to {output_file}"
+        )
+
+        pgstac_to_parquet(
+            conninfo=conninfo,
+            output_path=str(output_file),
+            collection=partition.collection,
+            start_datetime=partition.start,
+            end_datetime=partition.end,
+            chunk_size=chunk_size,
+            row_func=row_func,
+            filesystem=filesystem,
+            **kwargs,
+        )
+
+    if partitions_found == 0:
+        logger.info(
+            f"No partitions found for collection {collection} "
+            f"(updated_after={updated_after})"
+        )
 
 
 def main() -> int:
@@ -182,7 +264,7 @@ def main() -> int:
 
     elif mode == "incremental":
         # Incremental mode - export only updated items
-        logger.info("Using incremental mode with sync_pgstac_to_parquet")
+        logger.info("Using incremental mode with collection-scoped sync")
 
         for coll in collections:
             collection_id = coll["name"]
@@ -198,8 +280,9 @@ def main() -> int:
 
             try:
                 logger.info(f"Syncing collection: {collection_id}")
-                sync_pgstac_to_parquet(
+                sync_collection_to_parquet(
                     conninfo=conninfo,
+                    collection=collection_id,
                     output_path=output_path,
                     updated_after=updated_after,
                     chunk_size=coll.get("chunk_size", 8192),
