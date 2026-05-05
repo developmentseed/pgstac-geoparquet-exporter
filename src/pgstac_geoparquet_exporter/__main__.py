@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import psycopg
-import pyarrow.fs as pafs  # type: ignore
+import pyarrow.fs as pafs
 import yaml
 from stac_geoparquet.pgstac_reader import pgstac_to_parquet, sync_pgstac_to_parquet
 
@@ -89,7 +89,7 @@ def main() -> int:
         region = os.environ.get("AWS_REGION", "us-east-1")
 
         # Create S3FileSystem with MinIO-compatible options
-        filesystem = pafs.S3FileSystem(
+        filesystem = pafs.S3FileSystem(  # type: ignore[attr-defined]
             access_key=os.environ.get("AWS_ACCESS_KEY_ID"),
             secret_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
             endpoint_override=endpoint,
