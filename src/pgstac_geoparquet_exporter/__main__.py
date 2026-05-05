@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """STAC GeoParquet Exporter"""
 
+import logging
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -10,6 +12,18 @@ import psycopg
 import pyarrow.fs as pafs
 import yaml
 from stac_geoparquet.pgstac_reader import pgstac_to_parquet, sync_pgstac_to_parquet
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ExportStats:
+    total_collections_seen: int = 0
+    exported_successfully: int = 0
+    skipped_empty: int = 0
+    skipped_existing: int = 0
+    failed_collections: int = 0
 
 
 def inject_stac_links(stac_api_url: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
@@ -101,13 +115,16 @@ def main() -> int:
         # Strip s3:// prefix from output_base when using custom filesystem
         output_base = output_base[5:]  # Remove 's3://'
 
+    stats = ExportStats()
+
     if mode == "complete":
         # Complete export
         for coll in collections:
             collection_id = coll["name"]
             partition_frequency = coll.get("partition_frequency")
+            stats.total_collections_seen += 1
 
-            print(f"Exporting collection: {collection_id}")
+            logger.info(f"Exporting collection: {collection_id}")
 
             # Determine output path
             output_path = f"{output_base}/{collection_id}"
@@ -116,45 +133,61 @@ def main() -> int:
             if filesystem is None:
                 Path(output_path).mkdir(parents=True, exist_ok=True)
 
-            if partition_frequency:
-                # Use sync_pgstac_to_parquet for partitioned exports
-                # This uses pgstac's built-in partitioning based on datetime
-                print(f"Using built-in pgstac partitioning for {collection_id}")
-                sync_pgstac_to_parquet(
-                    conninfo=conninfo,
-                    output_path=output_path,
-                    updated_after=None,  # Export all partitions
-                    chunk_size=coll.get("chunk_size", 8192),
-                    row_func=row_func,
-                    filesystem=filesystem,
+            try:
+                if partition_frequency:
+                    # Use sync_pgstac_to_parquet for partitioned exports
+                    # This uses pgstac's built-in partitioning based on datetime
+                    logger.info(
+                        f"Using built-in pgstac partitioning for {collection_id}"
+                    )
+                    sync_pgstac_to_parquet(
+                        conninfo=conninfo,
+                        output_path=output_path,
+                        updated_after=None,  # Export all partitions
+                        chunk_size=coll.get("chunk_size", 8192),
+                        row_func=row_func,
+                        filesystem=filesystem,
+                    )
+                else:
+                    # Single file export
+                    output_file = f"{output_path}/items.parquet"
+
+                    # Check if file exists and skip if rewrite=False
+                    if Path(output_file).exists() and not coll.get("rewrite", False):
+                        logger.info(
+                            f"Skipping {collection_id} - file exists and rewrite=False"
+                        )
+                        stats.skipped_existing += 1
+                        continue
+
+                    pgstac_to_parquet(
+                        conninfo=conninfo,
+                        output_path=output_file,
+                        collection=collection_id,
+                        chunk_size=coll.get("chunk_size", 8192),
+                        row_func=row_func,
+                        filesystem=filesystem,
+                    )
+
+                    logger.info(f"Exported {collection_id} to {output_file}")
+                stats.exported_successfully += 1
+            except StopIteration:
+                logger.warning(
+                    f"Skipping collection {collection_id}: no exportable items"
                 )
-            else:
-                # Single file export
-                output_file = f"{output_path}/items.parquet"
-
-                # Check if file exists and skip if rewrite=False
-                if Path(output_file).exists() and not coll.get("rewrite", False):
-                    print(f"Skipping {collection_id} - file exists and rewrite=False")
-                    continue
-
-                pgstac_to_parquet(
-                    conninfo=conninfo,
-                    output_path=output_file,
-                    collection=collection_id,
-                    chunk_size=coll.get("chunk_size", 8192),
-                    row_func=row_func,
-                    filesystem=filesystem,
-                )
-
-                print(f"Exported {collection_id} to {output_file}")
+                stats.skipped_empty += 1
+            except Exception as e:
+                logger.error(f"Failed to export collection {collection_id}: {e}")
+                stats.failed_collections += 1
 
     elif mode == "incremental":
         # Incremental mode - export only updated items
-        print("Using incremental mode with sync_pgstac_to_parquet")
+        logger.info("Using incremental mode with sync_pgstac_to_parquet")
 
         for coll in collections:
             collection_id = coll["name"]
             output_path = f"{output_base}/{collection_id}"
+            stats.total_collections_seen += 1
 
             # Only create local directories if not using S3
             if filesystem is None:
@@ -163,22 +196,44 @@ def main() -> int:
             # Get last update timestamp if available
             updated_after = coll.get("updated_after")  # Should be datetime or None
 
-            print(f"Syncing collection: {collection_id}")
-            sync_pgstac_to_parquet(
-                conninfo=conninfo,
-                output_path=output_path,
-                updated_after=updated_after,
-                chunk_size=coll.get("chunk_size", 8192),
-                row_func=row_func,
-                filesystem=filesystem,
-            )
-            print(f"Synced {collection_id}")
+            try:
+                logger.info(f"Syncing collection: {collection_id}")
+                sync_pgstac_to_parquet(
+                    conninfo=conninfo,
+                    output_path=output_path,
+                    updated_after=updated_after,
+                    chunk_size=coll.get("chunk_size", 8192),
+                    row_func=row_func,
+                    filesystem=filesystem,
+                )
+                logger.info(f"Synced {collection_id}")
+                stats.exported_successfully += 1
+            except StopIteration:
+                logger.warning(
+                    f"Skipping collection {collection_id}: no exportable items"
+                )
+                stats.skipped_empty += 1
+            except Exception as e:
+                logger.error(f"Failed to export collection {collection_id}: {e}")
+                stats.failed_collections += 1
     else:
-        print(f"Unknown export mode: {mode}", file=sys.stderr)
+        logger.error(f"Unknown export mode: {mode}")
         return 1
 
-    print("Export complete")
-    return 0
+    # Print summary
+    logger.info("\n=== Export Summary ===")
+    logger.info(f"Total collections seen: {stats.total_collections_seen}")
+    logger.info(f"Exported successfully: {stats.exported_successfully}")
+    logger.info(f"Skipped (empty): {stats.skipped_empty}")
+    logger.info(f"Skipped (existing): {stats.skipped_existing}")
+    logger.info(f"Failed: {stats.failed_collections}")
+
+    if stats.failed_collections > 0:
+        logger.error("Export completed with errors")
+        return 1
+    else:
+        logger.info("Export complete")
+        return 0
 
 
 if __name__ == "__main__":

@@ -385,3 +385,210 @@ def test_inject_stac_links_preserves_item_data():
     assert "visual" in result["assets"]
     # And links were added
     assert "links" in result
+
+
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pathlib.Path.mkdir")
+@patch("pathlib.Path.exists")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: empty-col\n",
+)
+def test_empty_collection_does_not_crash(
+    mock_file, mock_exists, mock_mkdir, mock_to_parquet, base_env
+):
+    """Verify empty collection raises StopIteration and is handled gracefully"""
+    mock_exists.return_value = False
+    mock_to_parquet.side_effect = StopIteration  # Empty collection
+    base_env["EXPORT_MODE"] = "complete"
+
+    with patch.dict(os.environ, base_env, clear=True):
+        result = main()
+
+    # Should exit 0 when only empty collections are skipped
+    assert result == 0
+    mock_to_parquet.assert_called_once()
+
+
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pathlib.Path.mkdir")
+@patch("pathlib.Path.exists")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: valid-col\n  - name: empty-col\n",
+)
+def test_mixed_valid_and_empty_collections(
+    mock_file, mock_exists, mock_mkdir, mock_to_parquet, base_env
+):
+    """Verify mixed case: one valid collection and one empty exports valid one and exits 0"""
+    mock_exists.return_value = False
+    # First call succeeds, second raises StopIteration
+    mock_to_parquet.side_effect = [None, StopIteration]
+    base_env["EXPORT_MODE"] = "complete"
+
+    with patch.dict(os.environ, base_env, clear=True):
+        result = main()
+
+    # Should exit 0 when only empty collections are skipped
+    assert result == 0
+    assert mock_to_parquet.call_count == 2
+
+
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pathlib.Path.mkdir")
+@patch("pathlib.Path.exists")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: error-col\n",
+)
+def test_real_error_causes_nonzero_exit(
+    mock_file, mock_exists, mock_mkdir, mock_to_parquet, base_env
+):
+    """Verify real error (not StopIteration) causes non-zero exit"""
+    mock_exists.return_value = False
+    mock_to_parquet.side_effect = RuntimeError("Network error")
+    base_env["EXPORT_MODE"] = "complete"
+
+    with patch.dict(os.environ, base_env, clear=True):
+        result = main()
+
+    # Should exit 1 when real errors occur
+    assert result == 1
+    mock_to_parquet.assert_called_once()
+
+
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pathlib.Path.mkdir")
+@patch("pathlib.Path.exists")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: col1\n  - name: col2\n  - name: col3\n",
+)
+def test_all_collections_fail_returns_nonzero(
+    mock_file, mock_exists, mock_mkdir, mock_to_parquet, base_env, caplog
+):
+    """Verify exit code 1 when all collections fail"""
+    caplog.set_level("INFO")
+    mock_exists.return_value = False
+    mock_to_parquet.side_effect = RuntimeError("DB connection failed")
+    base_env["EXPORT_MODE"] = "complete"
+
+    with patch.dict(os.environ, base_env, clear=True):
+        result = main()
+
+    assert result == 1
+    assert mock_to_parquet.call_count == 3
+    log_text = caplog.text
+    assert "Failed: 3" in log_text
+    assert "Exported successfully: 0" in log_text
+
+
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pathlib.Path.mkdir")
+@patch("pathlib.Path.exists")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: col1\n  - name: col2\n  - name: col3\n",
+)
+def test_summary_stats_logged(
+    mock_file, mock_exists, mock_mkdir, mock_to_parquet, base_env, caplog
+):
+    """Verify summary statistics are logged correctly"""
+    caplog.set_level("INFO")
+    mock_exists.return_value = False
+    # col1: success, col2: empty, col3: error
+    mock_to_parquet.side_effect = [None, StopIteration, RuntimeError("Test error")]
+    base_env["EXPORT_MODE"] = "complete"
+
+    with patch.dict(os.environ, base_env, clear=True):
+        result = main()
+
+    log_text = caplog.text
+    # Check summary is present
+    assert "Export Summary" in log_text
+    assert "Total collections seen: 3" in log_text
+    assert "Exported successfully: 1" in log_text
+    assert "Skipped (empty): 1" in log_text
+    assert "Failed: 1" in log_text
+    # Should exit 1 because of the error
+    assert result == 1
+
+
+@patch("pgstac_geoparquet_exporter.__main__.sync_pgstac_to_parquet")
+@patch("pathlib.Path.mkdir")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: empty-partitioned\n    partition_frequency: YS\n",
+)
+def test_empty_partitioned_collection_does_not_crash(
+    mock_file, mock_mkdir, mock_sync, base_env
+):
+    """Verify empty partitioned collection is handled gracefully"""
+    mock_sync.side_effect = StopIteration  # Empty collection
+    base_env["EXPORT_MODE"] = "complete"
+
+    with patch.dict(os.environ, base_env, clear=True):
+        result = main()
+
+    # Should exit 0 when only empty collections are skipped
+    assert result == 0
+    mock_sync.assert_called_once()
+
+
+@patch("pgstac_geoparquet_exporter.__main__.sync_pgstac_to_parquet")
+@patch("pathlib.Path.mkdir")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: empty-col\n",
+)
+def test_incremental_mode_empty_collection(mock_file, mock_mkdir, mock_sync, base_env):
+    """Verify incremental mode handles empty collections gracefully"""
+    mock_sync.side_effect = StopIteration
+    base_env["EXPORT_MODE"] = "incremental"
+
+    with patch.dict(os.environ, base_env, clear=True):
+        result = main()
+
+    # Should exit 0 when only empty collections are skipped
+    assert result == 0
+    mock_sync.assert_called_once()
+
+
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pathlib.Path.mkdir")
+@patch("pathlib.Path.exists")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: col1\n  - name: col2\n    rewrite: false\n",
+)
+def test_skipped_file_not_counted_as_failure(
+    mock_file, mock_exists, mock_mkdir, mock_to_parquet, base_env, caplog
+):
+    """Verify that skipped files (rewrite=false) are tracked separately"""
+    caplog.set_level("INFO")
+
+    # First call is col1 (doesn't exist), second is col2 (exists)
+    mock_exists.side_effect = [False, True]
+    base_env["EXPORT_MODE"] = "complete"
+
+    with patch.dict(os.environ, base_env, clear=True):
+        result = main()
+
+    # col1 should be exported, col2 should skip due to file existing and rewrite=false
+    assert mock_to_parquet.call_count == 1  # Only col1
+    assert result == 0  # Should still exit 0
+
+    log_text = caplog.text
+    assert "Total collections seen: 2" in log_text
+    assert "Exported successfully: 1" in log_text
+    assert "Skipped (existing): 1" in log_text
+    assert "Skipped (empty): 0" in log_text
+    assert "Failed: 0" in log_text
