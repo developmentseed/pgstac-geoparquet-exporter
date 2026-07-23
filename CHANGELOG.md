@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.2.4...v0.2.5) (2026-07-23)
+
+
+### Chores
+
+* **deps:** bump the minor-and-patch group across 1 directory with 5 updates ([#25](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/25)) ([58c3f58](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/58c3f58453b1a6ad605e46dd58086408da750eb3))
+
 ## [0.2.4](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.2.3...v0.2.4) (2026-05-05)
 
 
