@@ -55,8 +55,10 @@ database:
     user: user
     password: password
 
-# S3/Object storage configuration
+# Object storage configuration
 storage:
+  # s3://bucket/path, abfs://container@account.dfs.core.windows.net/path, or a local path.
+  # abfs:// authenticates via DefaultAzureCredential (e.g. workload identity).
   outputPath: "s3://some-bucket/geoparquet"
   existingSecret: ""
   secretKeys:
@@ -80,6 +82,12 @@ exportConfig:
 # Additional configuration
 labels: {}
 annotations: {}
+
+# ServiceAccount for export pods (e.g. one federated for Azure workload identity)
+serviceAccountName: ""
+
+# Extra labels on export pods only (e.g. azure.workload.identity/use: "true")
+podLabels: {}
 
 podSecurityContext:
   fsGroup: 1000

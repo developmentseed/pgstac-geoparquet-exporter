@@ -29,12 +29,18 @@ spec:
             app.kubernetes.io/component: {{ $mode }}-export
             app: geoparquet-export
             mode: {{ $mode }}
+            {{- range $key, $value := $.Values.podLabels }}
+            {{ $key }}: {{ $value | quote }}
+            {{- end }}
           {{- with $.Values.annotations }}
           annotations:
             {{- toYaml . | nindent 12 }}
           {{- end }}
         spec:
           restartPolicy: {{ $.Values.jobs.restartPolicy }}
+          {{- with $.Values.serviceAccountName }}
+          serviceAccountName: {{ . }}
+          {{- end }}
           {{- with $.Values.imagePullSecrets }}
           imagePullSecrets:
             {{- toYaml . | nindent 12 }}
