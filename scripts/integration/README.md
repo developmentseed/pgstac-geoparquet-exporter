@@ -8,7 +8,7 @@ The integration tests verify end-to-end functionality by:
 
 1. Setting up a Kubernetes cluster (k3d)
 2. Deploying PostgreSQL with pgSTAC
-3. Deploying MinIO for object storage
+3. Deploying S3-compatible object storage (Versity S3 Gateway)
 4. Loading test STAC data
 5. Running export jobs
 6. Validating the exported GeoParquet files
@@ -34,14 +34,14 @@ integration/
 ├── common.sh                 # Shared configuration and utilities
 ├── 00-setup-cluster.sh       # Create k3d cluster and install operators
 ├── 10-deploy-pgstac.sh       # Deploy and configure pgSTAC
-├── 20-deploy-minio.sh        # Deploy MinIO object storage
+├── 20-deploy-s3.sh           # Deploy S3-compatible object storage
 ├── 30-load-test-data.sh      # Load test STAC collection and items
 ├── 40-run-export.sh          # Deploy exporter and run jobs
 ├── 50-validate.sh            # Validate exported GeoParquet files
 ├── cleanup.sh                # Cleanup resources
 └── fixtures/                 # YAML and JSON test fixtures
     ├── pgstac-cluster.yaml
-    ├── minio.yaml
+    ├── s3.yaml
     ├── test-collection.json
     └── test-items.ndjson
 ```

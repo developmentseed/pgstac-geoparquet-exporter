@@ -17,7 +17,7 @@ CLUSTER_NAME=my-cluster NAMESPACE=my-ns ./scripts/integration-test.sh
 
 ### What It Tests
 
-1. **Infrastructure**: k3d cluster, PostgreSQL Operator, pgSTAC, MinIO, Helm chart
+1. **Infrastructure**: k3d cluster, PostgreSQL Operator, pgSTAC, S3 storage (Versity S3 Gateway), Helm chart
 2. **Data Loading**: Creates test collection + 3 STAC items via pypgstac
 3. **Export Jobs**: Triggers complete and incremental export jobs (both expected to succeed)
 4. **Validation**: Reads GeoParquet files with PyArrow and validates complete + incremental outputs
@@ -60,12 +60,11 @@ kubectl logs -n test job/test-complete-export
 
 **Validation fails**
 ```bash
-# Check MinIO
-kubectl get pods -n test -l app=minio
+# Check S3 storage
+kubectl get pods -n test -l app=s3
 
-# Access MinIO UI
-kubectl port-forward -n test svc/minio 9000:9000
-# Open http://localhost:9000 (minioadmin/minioadmin)
+# Access S3 API (credentials: S3_ACCESS_KEY/S3_SECRET_KEY in integration/common.sh)
+kubectl port-forward -n test svc/s3 9000:9000
 ```
 
 **Python deps fail**: Test skips validation and reports partial success

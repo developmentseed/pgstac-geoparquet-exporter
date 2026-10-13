@@ -9,6 +9,10 @@ export NAMESPACE="${NAMESPACE:-test}"
 export SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export FIXTURES_DIR="$SCRIPT_DIR/fixtures"
 
+# Test S3 storage credentials
+export S3_ACCESS_KEY="${S3_ACCESS_KEY:-s3admin}"
+export S3_SECRET_KEY="${S3_SECRET_KEY:-s3admin}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'

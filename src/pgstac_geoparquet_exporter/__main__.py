@@ -180,20 +180,20 @@ def main() -> int:
     else:
         collections = config.get("collections", [])
 
-    # Configure remote filesystem for S3/MinIO or Azure Blob Storage
+    # Configure remote filesystem for S3-compatible or Azure Blob Storage
     filesystem = None
     if output_base.startswith("s3://"):
         endpoint = os.environ.get("AWS_ENDPOINT_URL")
         region = os.environ.get("AWS_REGION", "us-east-1")
 
-        # Create S3FileSystem with MinIO-compatible options
+        # endpoint_override supports S3-compatible servers
         filesystem = pafs.S3FileSystem(  # type: ignore[attr-defined]
             access_key=os.environ.get("AWS_ACCESS_KEY_ID"),
             secret_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
             endpoint_override=endpoint,
             region=region,
             scheme="http" if endpoint and endpoint.startswith("http://") else "https",
-            allow_bucket_creation=True,  # Required for MinIO
+            allow_bucket_creation=True,  # Only affects create_dir, not file writes
             allow_bucket_deletion=False,
         )
         # Strip s3:// prefix from output_base when using custom filesystem

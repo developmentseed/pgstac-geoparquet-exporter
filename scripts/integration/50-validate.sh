@@ -6,9 +6,9 @@ source "$SCRIPT_DIR/common.sh"
 
 log_section "Validating GeoParquet files"
 
-# Port-forward MinIO to access it locally
-log_info "Setting up port-forward to MinIO"
-kubectl port-forward -n "$NAMESPACE" svc/minio 9000:9000 &
+# Port-forward S3 storage to access it locally
+log_info "Setting up port-forward to S3 storage"
+kubectl port-forward -n "$NAMESPACE" svc/s3 9000:9000 &
 PF_PID=$!
 
 # Cleanup function
@@ -34,6 +34,10 @@ if ! uv pip install --quiet pyarrow s3fs 2>/dev/null; then
     log_success "Validation skipped (dependencies unavailable)"
     exit 0
 fi
+
+# Validator reads S3 credentials from the standard AWS environment
+export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY"
+export AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY"
 
 # Run complete export validation
 log_info "Running complete export validation"
