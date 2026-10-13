@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.2.4...v0.3.0) (2026-10-13)
+
+
+### Features
+
+* support abfs:// output via AzureFileSystem ([#31](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/31)) ([bb3ce4f](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/bb3ce4f49f0650f0a86a29b7c5c4c29391a560d8))
+
+
+### Bug Fixes
+
+* integration tests s3 server. ([#32](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/32)) ([f74d8ac](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/f74d8acca00c7e790eb59469aa36df40fbc8f126))
+
+
+### Chores
+
+* **deps:** bump actions/checkout from 6.0.2 to 7.0.1 ([#30](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/30)) ([4e540bd](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/4e540bd2e2488ccb510e7f3734cdd9f2934e0342))
+* **deps:** bump actions/setup-python from 6.3.0 to 7.0.0 ([#29](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/29)) ([59d4287](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/59d42877fb48a82945e6f754f078b241bd9916f5))
+* **deps:** bump astral-sh/setup-uv from 7 to 8.3.2 ([#28](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/28)) ([b260928](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/b26092853caf72e8da5015d010c33dc2412e4985))
+* **deps:** bump the minor-and-patch group across 1 directory with 5 updates ([#25](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/25)) ([58c3f58](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/58c3f58453b1a6ad605e46dd58086408da750eb3))
+* **deps:** bump the minor-and-patch group with 3 updates ([#27](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/27)) ([d885d4d](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/d885d4d51f8ad897ea34f7752902a7c8f1c66349))
+
 ## [0.2.4](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.2.3...v0.2.4) (2026-05-05)
 
 
