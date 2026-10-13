@@ -92,7 +92,7 @@ echo ""
 # Run test phases
 "$INTEGRATION_DIR/00-setup-cluster.sh"
 "$INTEGRATION_DIR/10-deploy-pgstac.sh"
-"$INTEGRATION_DIR/20-deploy-minio.sh"
+"$INTEGRATION_DIR/20-deploy-s3.sh"
 "$INTEGRATION_DIR/30-load-test-data.sh"
 "$INTEGRATION_DIR/40-run-export.sh"
 

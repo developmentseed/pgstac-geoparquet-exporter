@@ -28,10 +28,10 @@ helm upgrade --install exporter charts/pgstac-geoparquet-exporter -n "$NAMESPACE
     --set extraEnv[0].name=PGDATABASE \
     --set extraEnv[0].value=pgstac \
     --set storage.outputPath=s3://test/geoparquet \
-    --set storage.existingSecret=minio-secret \
+    --set storage.existingSecret=s3-secret \
     --set storage.secretKeys.accessKeyId=accesskey \
     --set storage.secretKeys.secretAccessKey=secretkey \
-    --set storage.endpoint=http://minio:9000 \
+    --set storage.endpoint=http://s3:9000 \
     --set storage.region=us-east-1 \
     --set stacApiUrl=http://localhost \
     --set exportConfig.collections[0].name=test-collection \

@@ -486,7 +486,7 @@ def test_incremental_mode_s3_writes_new_run_file(
     )
     base_env["EXPORT_MODE"] = "incremental"
     base_env["OUTPUT_PATH"] = "s3://bucket/output"
-    base_env["AWS_ENDPOINT_URL"] = "http://minio:9000"
+    base_env["AWS_ENDPOINT_URL"] = "http://s3.example:9000"
     base_env["AWS_ACCESS_KEY_ID"] = "test"
     base_env["AWS_SECRET_ACCESS_KEY"] = "test"
 

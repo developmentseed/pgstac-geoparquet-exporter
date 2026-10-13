@@ -2,8 +2,9 @@
 """
 Validate GeoParquet files exported from pgSTAC.
 
-This script connects to an S3-compatible storage (MinIO) and validates
+This script connects to an S3-compatible storage and validates
 that the exported GeoParquet files contain the expected STAC data.
+Credentials come from the standard AWS environment (AWS_ACCESS_KEY_ID, ...).
 
 Note: This validator supports two STAC GeoParquet schema formats:
   1. Nested properties (older): STAC properties stored in a 'properties' column
@@ -29,8 +30,6 @@ except ImportError:
 
 def validate_parquet_files(
     bucket_path: str,
-    access_key: str = "minioadmin",
-    secret_key: str = "minioadmin",
     endpoint_url: str = "http://localhost:9000",
     expected_rows: Optional[int] = None,
     exact_rows: bool = False,
@@ -41,8 +40,6 @@ def validate_parquet_files(
 
     Args:
         bucket_path: S3 path to validate (e.g., 'test/geoparquet/test-collection')
-        access_key: S3 access key
-        secret_key: S3 secret key
         endpoint_url: S3 endpoint URL
         expected_rows: Expected number of rows (None to skip check)
         exact_rows: Require exact row count instead of minimum
@@ -53,10 +50,10 @@ def validate_parquet_files(
     """
     # Setup S3 filesystem
     fs = s3fs.S3FileSystem(
-        key=access_key,
-        secret=secret_key,
         client_kwargs={"endpoint_url": endpoint_url},
         use_ssl=False,
+        # Local S3-compatible servers don't resolve virtual-hosted bucket names
+        config_kwargs={"s3": {"addressing_style": "path"}},
     )
 
     try:
@@ -195,16 +192,6 @@ def main():
         help="S3 bucket path to validate (e.g., test/geoparquet/test-collection)",
     )
     parser.add_argument(
-        "--access-key",
-        default="minioadmin",
-        help="S3 access key (default: minioadmin)",
-    )
-    parser.add_argument(
-        "--secret-key",
-        default="minioadmin",
-        help="S3 secret key (default: minioadmin)",
-    )
-    parser.add_argument(
         "--endpoint",
         default="http://localhost:9000",
         help="S3 endpoint URL (default: http://localhost:9000)",
@@ -231,8 +218,6 @@ def main():
 
     success = validate_parquet_files(
         bucket_path=args.bucket_path,
-        access_key=args.access_key,
-        secret_key=args.secret_key,
         endpoint_url=args.endpoint,
         expected_rows=args.expected_rows,
         exact_rows=args.exact_rows,
