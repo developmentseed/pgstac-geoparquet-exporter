@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/pgstac-geoparquet-exporter-v0.2.0...pgstac-geoparquet-exporter-v0.3.0) (2026-10-13)
+
+
+### Features
+
+* support abfs:// output via AzureFileSystem ([#31](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/31)) ([bb3ce4f](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/bb3ce4f49f0650f0a86a29b7c5c4c29391a560d8))
+
 ## [0.2.0](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/pgstac-geoparquet-exporter-v0.1.0...pgstac-geoparquet-exporter-v0.2.0) (2026-03-12)
 
 
