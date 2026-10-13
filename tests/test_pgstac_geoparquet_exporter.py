@@ -3,16 +3,20 @@ import sys
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch, mock_open, MagicMock
 
+import pyarrow.fs as pafs
 import pytest
 
 # Mock heavy dependencies
 sys.modules["stac_geoparquet"] = Mock()
 sys.modules["stac_geoparquet.pgstac_reader"] = Mock()
 
+FileType = pafs.FileType  # type: ignore[attr-defined]
+
 from pgstac_geoparquet_exporter.__main__ import (  # noqa: E402
     build_incremental_output_file,
     inject_stac_links,
     main,
+    parse_abfs_url,
 )
 
 
@@ -267,6 +271,40 @@ def test_rewrite_false_skips_existing_file(
     mock_to_parquet.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("rewrite", "file_type", "expect_export"),
+    [
+        ("false", FileType.File, False),
+        ("false", FileType.NotFound, True),
+        ("true", FileType.File, True),
+    ],
+)
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pathlib.Path.exists")
+def test_rewrite_checks_remote_filesystem(
+    mock_exists, mock_to_parquet, rewrite, file_type, expect_export, base_env
+):
+    """Verify rewrite=false checks the remote filesystem, not the local disk."""
+    base_env["EXPORT_MODE"] = "complete"
+    base_env["OUTPUT_PATH"] = "abfs://exports@myacct.dfs.core.windows.net/out"
+    azure_fs = MagicMock()
+    azure_fs.get_file_info.return_value.type = file_type
+    config = f"collections:\n  - name: test\n    rewrite: {rewrite}\n"
+
+    with (
+        patch("builtins.open", mock_open(read_data=config)),
+        patch("pyarrow.fs.AzureFileSystem", return_value=azure_fs),
+        patch.dict(os.environ, base_env, clear=True),
+    ):
+        result = main()
+
+    assert result == 0
+    mock_exists.assert_not_called()
+    if rewrite == "false":
+        azure_fs.get_file_info.assert_called_once_with("exports/out/test/full.parquet")
+    assert mock_to_parquet.called == expect_export
+
+
 @patch("pgstac_geoparquet_exporter.__main__.sync_pgstac_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch(
@@ -464,6 +502,88 @@ def test_incremental_mode_s3_writes_new_run_file(
         == "bucket/output/test/updates/20260505T142300Z_deadbeef.parquet"
     )
     assert call_kwargs["filesystem"] == s3_fs
+
+
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pathlib.Path.mkdir")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: test\n",
+)
+def test_incremental_mode_abfs_writes_new_run_file(
+    mock_file,
+    mock_mkdir,
+    mock_to_parquet,
+    base_env,
+):
+    """Verify abfs:// output uses AzureFileSystem with the default credential."""
+    base_env["EXPORT_MODE"] = "incremental"
+    base_env["OUTPUT_PATH"] = "abfs://exports@myacct.dfs.core.windows.net/geoparquet"
+
+    with patch("pyarrow.fs.AzureFileSystem", return_value=MagicMock()) as mock_azfs:
+        with patch.dict(os.environ, base_env, clear=True):
+            result = main()
+
+    assert result == 0
+    mock_azfs.assert_called_once_with(account_name="myacct")
+    call_kwargs = mock_to_parquet.call_args[1]
+    assert call_kwargs["output_path"].startswith("exports/geoparquet/test/updates/")
+    assert call_kwargs["filesystem"] == mock_azfs.return_value
+    mock_mkdir.assert_not_called()
+
+
+@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pathlib.Path.mkdir")
+@patch("pathlib.Path.exists", return_value=False)
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: landsat\n",
+)
+def test_complete_mode_abfs_skips_local_mkdir(
+    mock_file, mock_exists, mock_mkdir, mock_to_parquet, base_env
+):
+    """Verify complete mode writes to Azure without creating local directories."""
+    base_env["EXPORT_MODE"] = "complete"
+    base_env["OUTPUT_PATH"] = "abfss://exports@myacct.dfs.core.windows.net/out/"
+    azure_fs = MagicMock()
+    azure_fs.get_file_info.return_value.type = FileType.NotFound
+
+    with patch("pyarrow.fs.AzureFileSystem", return_value=azure_fs):
+        with patch.dict(os.environ, base_env, clear=True):
+            result = main()
+
+    assert result == 0
+    mock_mkdir.assert_not_called()
+    call_kwargs = mock_to_parquet.call_args[1]
+    assert call_kwargs["output_path"] == "exports/out/landsat/full.parquet"
+
+
+def test_parse_abfs_url_account_in_host():
+    assert parse_abfs_url("abfs://exports@myacct.dfs.core.windows.net/geoparquet") == (
+        "myacct",
+        "exports/geoparquet",
+    )
+
+
+def test_parse_abfs_url_abfss_trailing_slash():
+    assert parse_abfs_url("abfss://exports@myacct.dfs.core.windows.net/a/b/") == (
+        "myacct",
+        "exports/a/b",
+    )
+
+
+def test_parse_abfs_url_container_only():
+    assert parse_abfs_url("abfs://exports@myacct.dfs.core.windows.net") == (
+        "myacct",
+        "exports",
+    )
+
+
+def test_parse_abfs_url_missing_account_raises():
+    with pytest.raises(ValueError, match="container>@<account>"):
+        parse_abfs_url("abfs://exports/geoparquet")
 
 
 def test_unknown_mode_returns_error(base_env):

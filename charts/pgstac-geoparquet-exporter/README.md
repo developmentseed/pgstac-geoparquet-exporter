@@ -73,14 +73,29 @@ jobs:
 |-----------|-------------|---------|
 | `stacApiUrl` | **Required**. STAC API URL for link injection | `""` |
 | `database.existingSecret` | DB credentials secret name | `default-pguser-eoapi` |
-| `storage.outputPath` | Output path (s3:// or local) | `s3://some-bucket/geoparquet` |
+| `storage.outputPath` | Output path (s3://, abfs:// or local) | `s3://some-bucket/geoparquet` |
 | `storage.existingSecret` | S3 credentials secret name | `""` |
 | `storage.endpoint` | Custom S3 endpoint URL | `""` |
 | `storage.region` | AWS region | `""` |
+| `serviceAccountName` | ServiceAccount for export pods | `""` |
+| `podLabels` | Extra labels on export pods | `{}` |
 | `jobs.complete.schedule` | Complete export cron schedule | `"0 2 1 * *"` |
 | `jobs.incremental.schedule` | Incremental export cron schedule | `"0 3 * * *"` |
 | `exportConfig.exportAll` | Export all collections from database | `false` |
 | `exportConfig.collections[].partition_by` | Partitioning: `null`, `year`, `month` | `year` |
+
+### Azure Blob Storage (workload identity)
+
+`abfs://` output authenticates with `DefaultAzureCredential`. With AKS workload identity, use a
+ServiceAccount federated with a managed identity that can write to the container:
+
+```yaml
+storage:
+  outputPath: abfs://exports@myaccount.dfs.core.windows.net/geoparquet
+serviceAccountName: geoparquet-exporter
+podLabels:
+  azure.workload.identity/use: "true"
+```
 
 ## Usage
 

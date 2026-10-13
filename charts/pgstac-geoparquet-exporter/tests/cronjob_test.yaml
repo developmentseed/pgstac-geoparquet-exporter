@@ -418,3 +418,31 @@ tests:
       - equal:
           path: metadata.namespace
           value: my-release-namespace
+
+  - it: should not set service account by default
+    asserts:
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.serviceAccountName
+
+  - it: should set service account when provided
+    set:
+      serviceAccountName: exporter-sa
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.serviceAccountName
+          value: exporter-sa
+
+  - it: should add pod labels to pod template only
+    set:
+      podLabels:
+        azure.workload.identity/use: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.metadata.labels["azure.workload.identity/use"]
+          value: "true"
+      - equal:
+          path: spec.jobTemplate.spec.template.metadata.labels["app.kubernetes.io/component"]
+          value: complete-export
+        documentIndex: 0
+      - notExists:
+          path: metadata.labels["azure.workload.identity/use"]

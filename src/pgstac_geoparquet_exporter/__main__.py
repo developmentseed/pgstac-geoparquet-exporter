@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlparse
 
 import psycopg
 import pyarrow.fs as pafs
@@ -72,6 +73,35 @@ def build_incremental_output_file(output_path: str, dataset_dirname: str) -> str
     base_path = output_path.rstrip("/")
     normalized_dirname = dataset_dirname.strip("/") or "updates"
     return f"{base_path}/{normalized_dirname}/{filename}"
+
+
+def output_exists(path: str, filesystem: Any | None) -> bool:
+    """Check whether path exists locally or on the configured remote filesystem."""
+    if filesystem is None:
+        return Path(path).exists()
+    file_type = filesystem.get_file_info(path).type
+    return bool(file_type != pafs.FileType.NotFound)  # type: ignore[attr-defined]
+
+
+def parse_abfs_url(url: str) -> tuple[str, str]:
+    """Return (account_name, container/path) for an abfs[s]:// URL.
+
+    Expects abfs://<container>@<account>.dfs.core.windows.net/<path>.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("abfs", "abfss"):
+        raise ValueError(f"Not an abfs:// URL: {url}")
+
+    container, _, host = parsed.netloc.partition("@")
+    account_name = host.split(".", 1)[0]
+    if not container or not account_name:
+        raise ValueError(
+            f"Cannot determine Azure storage account/container from {url}; use "
+            "abfs://<container>@<account>.dfs.core.windows.net/<path>"
+        )
+
+    path = parsed.path.strip("/")
+    return account_name, f"{container}/{path}" if path else container
 
 
 def export_incremental_with_updated_after(
@@ -150,7 +180,7 @@ def main() -> int:
     else:
         collections = config.get("collections", [])
 
-    # Configure S3 filesystem if using S3/MinIO
+    # Configure remote filesystem for S3/MinIO or Azure Blob Storage
     filesystem = None
     if output_base.startswith("s3://"):
         endpoint = os.environ.get("AWS_ENDPOINT_URL")
@@ -168,6 +198,10 @@ def main() -> int:
         )
         # Strip s3:// prefix from output_base when using custom filesystem
         output_base = output_base[5:]  # Remove 's3://'
+    elif output_base.startswith(("abfs://", "abfss://")):
+        # Authenticates via DefaultAzureCredential (e.g. workload identity)
+        account_name, output_base = parse_abfs_url(output_base)
+        filesystem = pafs.AzureFileSystem(account_name=account_name)  # type: ignore[attr-defined]
 
     stats = ExportStats()
 
@@ -208,7 +242,9 @@ def main() -> int:
                     output_file = f"{output_path}/{filename}"
 
                     # Check if file exists and skip if rewrite=False
-                    if Path(output_file).exists() and not coll.get("rewrite", False):
+                    if output_exists(output_file, filesystem) and not coll.get(
+                        "rewrite", False
+                    ):
                         logger.info(
                             f"Skipping {collection_id} - file exists and rewrite=False"
                         )
