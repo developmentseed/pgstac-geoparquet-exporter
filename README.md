@@ -35,6 +35,14 @@ Run the exporter:
 python -m pgstac_geoparquet_exporter
 ```
 
+### Azure Blob Storage
+
+`OUTPUT_PATH` accepts `abfs://<container>@<account>.dfs.core.windows.net/<path>` (or `abfss://`)
+URLs, written through `pyarrow.fs.AzureFileSystem`.
+
+Authentication uses `DefaultAzureCredential`, so workload identity, managed identity, or
+`AZURE_CLIENT_ID`/`AZURE_TENANT_ID`/`AZURE_CLIENT_SECRET` environment variables all work.
+
 ## Configuration
 
 Create `export-config.yaml`:
