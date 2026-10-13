@@ -75,6 +75,14 @@ def build_incremental_output_file(output_path: str, dataset_dirname: str) -> str
     return f"{base_path}/{normalized_dirname}/{filename}"
 
 
+def output_exists(path: str, filesystem: Any | None) -> bool:
+    """Check whether path exists locally or on the configured remote filesystem."""
+    if filesystem is None:
+        return Path(path).exists()
+    file_type = filesystem.get_file_info(path).type
+    return bool(file_type != pafs.FileType.NotFound)  # type: ignore[attr-defined]
+
+
 def parse_abfs_url(url: str) -> tuple[str, str]:
     """Return (account_name, container/path) for an abfs[s]:// URL.
 
@@ -234,7 +242,9 @@ def main() -> int:
                     output_file = f"{output_path}/{filename}"
 
                     # Check if file exists and skip if rewrite=False
-                    if Path(output_file).exists() and not coll.get("rewrite", False):
+                    if output_exists(output_file, filesystem) and not coll.get(
+                        "rewrite", False
+                    ):
                         logger.info(
                             f"Skipping {collection_id} - file exists and rewrite=False"
                         )
