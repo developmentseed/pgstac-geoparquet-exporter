@@ -45,10 +45,20 @@ exportConfig:
   # Specify individual collections (or leave empty and set exportAll: true)
   collections:
     - name: sentinel-2
-      partition_by: year
-      start_year: 2015
-    - name: landsat-8
-      partition_by: null  # Single file
+      partition_frequency: YS  # One file per pgSTAC partition
+    - name: landsat-8          # Single full.parquet
+
+  # Defaults for every collection
+  settings:
+    chunk_size: 8192
+    max_chunk_mb: 64
+    statement_timeout: 3600000
+    rewrite: true
+
+  # Per-collection settings, also applied with exportAll: true
+  overrides:
+    emdat-events:
+      chunk_size: 500
 
 # Job schedules and resources
 jobs:
@@ -82,7 +92,12 @@ jobs:
 | `jobs.complete.schedule` | Complete export cron schedule | `"0 2 1 * *"` |
 | `jobs.incremental.schedule` | Incremental export cron schedule | `"0 3 * * *"` |
 | `exportConfig.exportAll` | Export all collections from database | `false` |
-| `exportConfig.collections[].partition_by` | Partitioning: `null`, `year`, `month` | `year` |
+| `exportConfig.collections[].partition_frequency` | Set to export one file per pgSTAC partition | unset |
+| `exportConfig.settings.chunk_size` | Max items per chunk | `8192` |
+| `exportConfig.settings.max_chunk_mb` | Max approximate JSON size per chunk (MB) | `64` |
+| `exportConfig.settings.statement_timeout` | Postgres statement timeout (ms) | `3600000` |
+| `exportConfig.settings.rewrite` | Complete mode replaces existing files | `true` |
+| `exportConfig.overrides.<collection>` | Per-collection settings | `{}` |
 
 ### Azure Blob Storage (workload identity)
 
@@ -117,12 +132,14 @@ helm upgrade exporter ./charts/pgstac-geoparquet-exporter -n data-access -f valu
 
 ### Export All Collections
 
-Set `exportConfig.exportAll: true` to automatically export all collections from the pgSTAC database instead of manually specifying them. Useful when collections are added dynamically.
+Set `exportConfig.exportAll: true` to automatically export all collections from the pgSTAC database instead of manually specifying them. Useful when collections are added dynamically. `settings` apply to every collection and `overrides` to the named ones (precedence: `settings` < `overrides` < `collections[]` entry).
+
+With `rewrite: false`, complete mode keeps a readable existing file. Empty or unreadable files (e.g. from a failed run) are always rewritten.
 
 ## Advanced Options
 
 Additional configuration available in `values.yaml`:
-- `exportConfig.settings` - chunk_size, statement_timeout
+- `exportConfig.settings`, `exportConfig.overrides` - chunk_size, max_chunk_mb, statement_timeout, rewrite
 - `jobs` - successfulJobsHistoryLimit, failedJobsHistoryLimit, concurrencyPolicy
 - `extraEnv`, `extraVolumes`, `extraVolumeMounts` - Additional resources
 - `nodeSelector`, `tolerations`, `affinity` - Pod scheduling

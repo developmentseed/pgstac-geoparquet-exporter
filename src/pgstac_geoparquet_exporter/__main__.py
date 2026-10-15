@@ -14,11 +14,9 @@ from urllib.parse import urlparse
 import psycopg
 import pyarrow as pa
 import pyarrow.fs as pafs
+import pyarrow.parquet as pq
 import yaml
-from stac_geoparquet.pgstac_reader import (
-    get_pgstac_partitions,
-    sync_pgstac_to_parquet,
-)
+from stac_geoparquet.pgstac_reader import get_pgstac_partitions
 
 from pgstac_geoparquet_exporter.writer import export_items_to_parquet
 
@@ -78,11 +76,27 @@ def build_incremental_output_file(output_path: str, dataset_dirname: str) -> str
 
 
 def output_exists(path: str, filesystem: Any | None) -> bool:
-    """Check whether path exists locally or on the configured remote filesystem."""
+    """Check whether a readable Parquet file exists locally or remotely at path.
+
+    Empty or truncated files (e.g. left by a failed run) count as missing.
+    """
     if filesystem is None:
-        return Path(path).exists()
-    file_type = filesystem.get_file_info(path).type
-    return bool(file_type != pafs.FileType.NotFound)  # type: ignore[attr-defined]
+        if not Path(path).exists():
+            return False
+    elif filesystem.get_file_info(path).type == pafs.FileType.NotFound:  # type: ignore[attr-defined]
+        return False
+    try:
+        pq.read_metadata(path, filesystem=filesystem)  # type: ignore[no-untyped-call]
+    except (OSError, pa.ArrowException) as e:
+        logger.warning(f"Existing {path} is not a readable Parquet file ({e})")
+        return False
+    return True
+
+
+def export_options(coll: dict[str, Any]) -> dict[str, Any]:
+    """Chunking and query settings set for this collection (writer has defaults)."""
+    keys = ("chunk_size", "max_chunk_mb", "statement_timeout")
+    return {key: coll[key] for key in keys if key in coll}
 
 
 def parse_abfs_url(url: str) -> tuple[str, str]:
@@ -106,19 +120,17 @@ def parse_abfs_url(url: str) -> tuple[str, str]:
     return account_name, f"{container}/{path}" if path else container
 
 
-def export_incremental_with_updated_after(
+def export_partitions(
     conninfo: str,
     collection_id: str,
-    output_path: str,
-    dataset_dirname: str,
-    updated_after: datetime,
-    chunk_size: int,
+    output_dir: str,
+    updated_after: datetime | None,
+    options: dict[str, Any],
     row_func: Callable[[dict[str, Any]], dict[str, Any]],
     filesystem: Any | None,
+    file_prefix: str = "",
 ) -> int:
-    """Export filtered partition windows for one collection."""
-    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    run_id = uuid.uuid4().hex[:8]
+    """Export one file per pgSTAC partition window of one collection."""
     exported = 0
 
     for partition in get_pgstac_partitions(conninfo, updated_after):
@@ -127,17 +139,15 @@ def export_incremental_with_updated_after(
         partition_name = (
             Path(partition.partition).name or f"partition-{exported}.parquet"
         )
-        output_file = (
-            f"{output_path}/{dataset_dirname}/{timestamp}_{run_id}_{partition_name}"
-        )
+        output_file = f"{output_dir}/{file_prefix}{partition_name}"
         export_items_to_parquet(
             conninfo=conninfo,
             output_path=output_file,
             collection=collection_id,
             start_datetime=partition.start,
             end_datetime=partition.end,
-            chunk_size=chunk_size,
             row_func=row_func,
+            **options,
             filesystem=filesystem,
         )
         exported += 1
@@ -175,12 +185,15 @@ def main() -> int:
         print("Fetching all collections from database...")
         collections = get_all_collections(conninfo)
         print(f"Found {len(collections)} collections")
-        # Apply default settings from config
-        default_settings = config.get("exportConfig", {}).get("settings", {})
-        for coll in collections:
-            coll.update(default_settings)
     else:
-        collections = config.get("collections", [])
+        collections = config.get("collections") or []
+
+    # Precedence: settings < overrides[collection] < collection entry
+    settings = config.get("settings") or {}
+    overrides = config.get("overrides") or {}
+    collections = [
+        {**settings, **overrides.get(coll["name"], {}), **coll} for coll in collections
+    ]
 
     # Configure remote filesystem for S3-compatible or Azure Blob Storage
     filesystem = None
@@ -225,27 +238,29 @@ def main() -> int:
 
             try:
                 if partition_frequency:
-                    # Use sync_pgstac_to_parquet for partitioned exports
-                    # This uses pgstac's built-in partitioning based on datetime
+                    # One file per pgSTAC partition (datetime-based)
                     logger.info(
                         f"Using built-in pgstac partitioning for {collection_id}"
                     )
-                    sync_pgstac_to_parquet(
+                    if not export_partitions(
                         conninfo=conninfo,
-                        output_path=output_path,
+                        collection_id=collection_id,
+                        # Same layout as stac-geoparquet's sync_pgstac_to_parquet
+                        output_dir=f"{output_path}/{collection_id}",
                         updated_after=None,  # Export all partitions
-                        chunk_size=coll.get("chunk_size", 8192),
+                        options=export_options(coll),
                         row_func=row_func,
                         filesystem=filesystem,
-                    )
+                    ):
+                        raise StopIteration
                 else:
                     # Single file export - write to configurable filename (default: full.parquet)
                     filename = coll.get("complete_filename", "full.parquet")
                     output_file = f"{output_path}/{filename}"
 
-                    # Check if file exists and skip if rewrite=False
-                    if output_exists(output_file, filesystem) and not coll.get(
-                        "rewrite", False
+                    # A complete snapshot is rewritten unless rewrite=False
+                    if not coll.get("rewrite", True) and output_exists(
+                        output_file, filesystem
                     ):
                         logger.info(
                             f"Skipping {collection_id} - file exists and rewrite=False"
@@ -257,9 +272,9 @@ def main() -> int:
                         conninfo=conninfo,
                         output_path=output_file,
                         collection=collection_id,
-                        chunk_size=coll.get("chunk_size", 8192),
                         row_func=row_func,
                         filesystem=filesystem,
+                        **export_options(coll),
                     )
 
                     logger.info(f"Exported {collection_id} to {output_file}")
@@ -292,6 +307,9 @@ def main() -> int:
 
             # Get last update timestamp if available
             updated_after = coll.get("updated_after")  # Should be datetime or None
+            # The Helm chart renders timestamps as quoted strings
+            if isinstance(updated_after, str):
+                updated_after = datetime.fromisoformat(updated_after)
 
             # Write incremental updates as per-run files in a dataset directory.
             # Default layout: {collection}/updates/{timestamp}_{runid}.parquet
@@ -313,23 +331,24 @@ def main() -> int:
                         conninfo=conninfo,
                         output_path=output_file,
                         collection=collection_id,
-                        chunk_size=coll.get("chunk_size", 8192),
                         row_func=row_func,
                         filesystem=filesystem,
+                        **export_options(coll),
                     )
                     logger.info(
                         f"Exported incremental updates for {collection_id} to {output_file}"
                     )
                 else:
-                    exported_count = export_incremental_with_updated_after(
+                    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+                    exported_count = export_partitions(
                         conninfo=conninfo,
                         collection_id=collection_id,
-                        output_path=output_path,
-                        dataset_dirname=normalized_dirname,
+                        output_dir=f"{output_path}/{normalized_dirname}",
                         updated_after=updated_after,
-                        chunk_size=coll.get("chunk_size", 8192),
+                        options=export_options(coll),
                         row_func=row_func,
                         filesystem=filesystem,
+                        file_prefix=f"{timestamp}_{uuid.uuid4().hex[:8]}_",
                     )
                     if exported_count == 0:
                         raise StopIteration

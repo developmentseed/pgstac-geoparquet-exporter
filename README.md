@@ -48,15 +48,23 @@ Authentication uses `DefaultAzureCredential`, so workload identity, managed iden
 Create `export-config.yaml`:
 
 ```yaml
+exportAll: false  # true exports every collection in the database
 collections:
   - name: sentinel-2
-    partition_by: year
-    start_year: 2015
-  - name: landsat
-    partition_by: null  # Single file
+    partition_frequency: YS
+  - name: landsat  # Single file
     complete_filename: baseline.parquet  # Optional, defaults to "full.parquet"
     incremental_dirname: delta  # Optional, defaults to "updates" (directory)
+settings:  # Defaults for every collection
+  chunk_size: 8192
+  max_chunk_mb: 64
+  statement_timeout: 3600000
+overrides:  # Per-collection settings, also applied with exportAll
+  emdat-events:
+    chunk_size: 500
 ```
+
+Per collection, values combine as `settings` < `overrides[name]` < `collections[]` entry.
 
 ### Configuration Options
 
@@ -64,8 +72,10 @@ Per-collection settings:
 
 - `name`: Collection ID (required)
 - `partition_frequency`: Partition by time (`YS` for yearly, `MS` for monthly, etc.)
-- `chunk_size`: Number of items per chunk (default: 8192)
-- `rewrite`: Whether to overwrite existing files (default: false)
+- `chunk_size`: Max items per chunk (default: 8192)
+- `max_chunk_mb`: Max approximate JSON size per chunk in MB, bounds memory for large geometries (default: 64)
+- `statement_timeout`: Postgres statement timeout in ms (default: none)
+- `rewrite`: Complete mode replaces existing files (default: true). Empty or unreadable files are always rewritten
 - `updated_after`: Datetime filter for incremental exports
 - `complete_filename`: Filename for non-partitioned complete exports (default: `full.parquet`)
 - `incremental_dirname`: Directory name for incremental run files (default: `updates`)

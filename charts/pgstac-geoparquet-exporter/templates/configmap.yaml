@@ -10,21 +10,12 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 data:
+  # Read by main(): exportAll, collections, settings, overrides
   export-config.yaml: |
     exportAll: {{ .Values.exportConfig.exportAll }}
-    
     collections:
-    {{- range .Values.exportConfig.collections }}
-      - name: {{ .name }}
-        partition_by: {{ .partition_by | default "null" }}
-        {{- with .start_year }}
-        start_year: {{ . }}
-        {{- end }}
-        {{- with .start_month }}
-        start_month: {{ . }}
-        {{- end }}
-    {{- end }}
-
+      {{- toYaml (.Values.exportConfig.collections | default list) | nindent 6 }}
     settings:
-      chunk_size: {{ printf "%d" (int .Values.exportConfig.settings.chunk_size) }}
-      statement_timeout: {{ printf "%d" (int .Values.exportConfig.settings.statement_timeout) }}
+      {{- toYaml (.Values.exportConfig.settings | default dict) | nindent 6 }}
+    overrides:
+      {{- toYaml (.Values.exportConfig.overrides | default dict) | nindent 6 }}

@@ -631,10 +631,11 @@ wheels = [
 
 [[package]]
 name = "pgstac-geoparquet-exporter"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "." }
 dependencies = [
     { name = "fsspec" },
+    { name = "orjson" },
     { name = "psycopg", extra = ["binary"] },
     { name = "psycopg-pool" },
     { name = "pyarrow" },
@@ -656,6 +657,7 @@ dev = [
 requires-dist = [
     { name = "fsspec", specifier = ">=2023.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.19.0" },
+    { name = "orjson", specifier = ">=3.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.0" },
     { name = "psycopg-pool", specifier = ">=3.0" },

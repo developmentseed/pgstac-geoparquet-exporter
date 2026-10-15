@@ -34,104 +34,45 @@ tests:
           path: metadata.annotations["another-annotation"]
           value: another-value
 
-  - it: should render export config with single collection
-    set:
-      exportConfig:
-        collections:
-          - name: test-collection
-            partition_by: year
-            start_year: 2020
-        settings:
-          chunk_size: 5000
-          statement_timeout: 1800000
+  # main() reads exportAll, collections, settings and overrides at the top level
+  - it: should render settings at the top level
     asserts:
       - matchRegex:
           path: data["export-config.yaml"]
-          pattern: "name: test-collection"
-      - matchRegex:
-          path: data["export-config.yaml"]
-          pattern: "partition_by: year"
-      - matchRegex:
-          path: data["export-config.yaml"]
-          pattern: "start_year: 2020"
-      - matchRegex:
-          path: data["export-config.yaml"]
-          pattern: "chunk_size: 5000"
-      - matchRegex:
-          path: data["export-config.yaml"]
-          pattern: "statement_timeout: 1800000"
+          pattern: "(?m)^settings:\n  chunk_size: 8192\n  max_chunk_mb: 64\n  rewrite: true\n  statement_timeout: 3600000$"
 
-  - it: should render export config with multiple collections
+  - it: should render overrides at the top level
     set:
       exportConfig:
-        collections:
-          - name: collection-1
-            partition_by: year
-            start_year: 2015
-          - name: collection-2
-            partition_by: month
-            start_year: 2020
-            start_month: 6
-          - name: collection-3
-            partition_by: null
-        settings:
-          chunk_size: 10000
-          statement_timeout: 3600000
+        exportAll: true
+        overrides:
+          emdat-events:
+            chunk_size: 500
+            rewrite: false
     asserts:
       - matchRegex:
           path: data["export-config.yaml"]
-          pattern: "name: collection-1"
+          pattern: "(?m)^exportAll: true$"
       - matchRegex:
           path: data["export-config.yaml"]
-          pattern: "name: collection-2"
-      - matchRegex:
-          path: data["export-config.yaml"]
-          pattern: "name: collection-3"
+          pattern: "(?m)^overrides:\n  emdat-events:\n    chunk_size: 500\n    rewrite: false$"
 
-  - it: should handle partition_by null value
+  - it: should pass collection entries through
     set:
       exportConfig:
         collections:
-          - name: test-collection
-            partition_by: null
-        settings:
-          chunk_size: 10000
-          statement_timeout: 3600000
+          - name: sentinel-2
+            partition_frequency: YS
+          - name: landsat
+            complete_filename: baseline.parquet
+            chunk_size: 1000
     asserts:
       - matchRegex:
           path: data["export-config.yaml"]
-          pattern: "partition_by: null"
-
-  - it: should handle collection with start_month
-    set:
-      exportConfig:
-        collections:
-          - name: monthly-collection
-            partition_by: month
-            start_year: 2020
-            start_month: 3
-        settings:
-          chunk_size: 10000
-          statement_timeout: 3600000
-    asserts:
+          pattern: "(?m)^collections:\n  - name: sentinel-2\n    partition_frequency: YS$"
       - matchRegex:
           path: data["export-config.yaml"]
-          pattern: "start_month: 3"
-
-  - it: should handle collection without optional fields
-    set:
-      exportConfig:
-        collections:
-          - name: minimal-collection
-            partition_by: year
-            start_year: 2020
-        settings:
-          chunk_size: 10000
-          statement_timeout: 3600000
-    asserts:
+          pattern: "complete_filename: baseline.parquet"
       - matchRegex:
           path: data["export-config.yaml"]
-          pattern: "name: minimal-collection"
-      - matchRegex:
-          path: data["export-config.yaml"]
-          pattern: "partition_by: year"
+          pattern: "chunk_size: 1000"

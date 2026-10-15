@@ -15,6 +15,7 @@ dependencies = [
     "pypgstac>=0.8.0",
     "pyyaml>=6.0",
     "fsspec>=2023.1.0",
+    "orjson>=3.0",  # writer.py chunk sizing
     "pyarrow>=16.0.0",  # pyarrow.fs.AzureFileSystem
     "tqdm>=4.0.0",
 ]

@@ -35,7 +35,6 @@ helm upgrade --install exporter charts/pgstac-geoparquet-exporter -n "$NAMESPACE
     --set storage.region=us-east-1 \
     --set stacApiUrl=http://localhost \
     --set exportConfig.collections[0].name=test-collection \
-    --set exportConfig.collections[0].partition_by=null \
     --set exportConfig.collections[0].updated_after=2022-01-01T00:00:00Z \
     --wait --timeout 2m
 

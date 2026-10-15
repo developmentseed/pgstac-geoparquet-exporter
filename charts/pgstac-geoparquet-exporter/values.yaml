@@ -67,17 +67,42 @@ storage:
   endpoint: ""
   region: ""
 
-# Export configuration
+# Export configuration, rendered as-is into export-config.yaml.
+# Per collection, values combine as: settings < overrides[name] < collections[] entry.
 exportConfig:
   # Set to true to export all collections from the database
   # When true, collections list below is ignored
   exportAll: false
-  
-  collections: []
 
+  # Collections to export when exportAll is false. Each entry takes a `name`
+  # plus any key from `settings`, and optionally:
+  #   partition_frequency: one file per pgSTAC partition instead of full.parquet
+  #   complete_filename: complete-mode file name (default: full.parquet)
+  #   incremental_dirname: incremental-mode directory (default: updates)
+  collections: []
+  # - name: my-collection
+  #   rewrite: false
+
+  # Defaults for every collection
   settings:
-    chunk_size: 10000
-    statement_timeout: 3600000  # milliseconds
+    # Max items per chunk
+    chunk_size: 8192
+    # Max approximate JSON size of a chunk (MB). Bounds memory for collections
+    # with large geometries, whatever chunk_size is.
+    max_chunk_mb: 64
+    # Postgres statement timeout (milliseconds)
+    statement_timeout: 3600000
+    # Complete mode: replace an existing file. With false, a readable existing
+    # file is kept; empty or unreadable files are always rewritten.
+    rewrite: true
+
+  # Per-collection settings, also applied with exportAll: true
+  overrides: {}
+  # Heavy-geometry collections (e.g. country polygons) can use smaller chunks:
+  #   emdat-events:
+  #     chunk_size: 500
+  #   emdat-impacts:
+  #     chunk_size: 500
 
 # Additional configuration
 labels: {}

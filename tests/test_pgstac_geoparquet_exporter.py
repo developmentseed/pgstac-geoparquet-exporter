@@ -26,27 +26,56 @@ def base_env():
     }
 
 
-@patch("pgstac_geoparquet_exporter.__main__.sync_pgstac_to_parquet")
+def make_partition(
+    collection: str, name: str, start: datetime, end: datetime
+) -> MagicMock:
+    partition = MagicMock()
+    partition.collection = collection
+    partition.partition = name
+    partition.start = start
+    partition.end = end
+    return partition
+
+
+@patch("pgstac_geoparquet_exporter.__main__.get_pgstac_partitions")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch(
     "builtins.open",
     new_callable=mock_open,
-    read_data="collections:\n  - name: sentinel-2\n    partition_frequency: YS\n",
+    read_data=(
+        "collections:\n  - name: sentinel-2\n    partition_frequency: YS\n"
+        "settings:\n  max_chunk_mb: 16\n"
+    ),
 )
-def test_yearly_partition_uses_sync_pgstac(mock_file, mock_mkdir, mock_sync, base_env):
-    """Verify yearly partition uses sync_pgstac_to_parquet"""
+def test_yearly_partition_exports_own_partitions(
+    mock_file, mock_mkdir, mock_export, mock_partitions, base_env
+):
+    """Partitioned exports write one file per partition of this collection only."""
+    start = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2021, 1, 1, tzinfo=timezone.utc)
+    mock_partitions.return_value = [
+        make_partition("sentinel-2", "items_20200101_20210101.parquet", start, end),
+        make_partition("landsat", "items_20200101_20210101.parquet", start, end),
+    ]
     base_env["EXPORT_MODE"] = "complete"
 
     with patch.dict(os.environ, base_env, clear=True):
-        main()
+        assert main() == 0
 
-    # Verify sync_pgstac_to_parquet was called
-    mock_sync.assert_called_once()
-    call_kwargs = mock_sync.call_args[1]
+    mock_partitions.assert_called_once()
+    assert mock_partitions.call_args[0][1] is None  # all partitions
+    mock_export.assert_called_once()
+    call_kwargs = mock_export.call_args[1]
     assert "testhost" in call_kwargs["conninfo"]
-    assert call_kwargs["output_path"] == "/output/sentinel-2"
-    assert call_kwargs["updated_after"] is None
-    assert call_kwargs["chunk_size"] == 8192  # default
+    assert call_kwargs["collection"] == "sentinel-2"
+    assert call_kwargs["output_path"] == (
+        "/output/sentinel-2/sentinel-2/items_20200101_20210101.parquet"
+    )
+    assert call_kwargs["start_datetime"] == start
+    assert call_kwargs["end_datetime"] == end
+    # Size-bounded like every other export
+    assert call_kwargs["max_chunk_mb"] == 16
 
 
 @patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
@@ -73,7 +102,7 @@ def test_no_partition_creates_single_file(
     assert "testhost" in call_kwargs["conninfo"]
     assert call_kwargs["output_path"] == "/output/landsat/full.parquet"
     assert call_kwargs["collection"] == "landsat"
-    assert call_kwargs["chunk_size"] == 8192  # default
+    assert "chunk_size" not in call_kwargs  # writer's default applies
 
 
 @patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
@@ -100,10 +129,10 @@ def test_multiple_collections_all_exported(
     assert "col2" in collections
 
 
-@patch("pgstac_geoparquet_exporter.__main__.sync_pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("builtins.open", new_callable=mock_open, read_data="collections: []\n")
-def test_incremental_mode_supported(mock_file, mock_mkdir, mock_sync, base_env):
+def test_incremental_mode_supported(mock_file, mock_mkdir, mock_export, base_env):
     """Verify incremental mode is now supported"""
     base_env["EXPORT_MODE"] = "incremental"
 
@@ -111,8 +140,8 @@ def test_incremental_mode_supported(mock_file, mock_mkdir, mock_sync, base_env):
         result = main()
 
     assert result == 0
-    # sync_pgstac_to_parquet not called because no collections
-    mock_sync.assert_not_called()
+    # Nothing exported because no collections
+    mock_export.assert_not_called()
 
 
 @patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
@@ -259,7 +288,10 @@ def test_rewrite_false_skips_existing_file(
     mock_exists.return_value = True  # File exists
     base_env["EXPORT_MODE"] = "complete"
 
-    with patch.dict(os.environ, base_env, clear=True):
+    with (
+        patch("pgstac_geoparquet_exporter.__main__.pq.read_metadata"),
+        patch.dict(os.environ, base_env, clear=True),
+    ):
         main()
 
     # Should not call export_items_to_parquet
@@ -289,6 +321,7 @@ def test_rewrite_checks_remote_filesystem(
     with (
         patch("builtins.open", mock_open(read_data=config)),
         patch("pyarrow.fs.AzureFileSystem", return_value=azure_fs),
+        patch("pgstac_geoparquet_exporter.__main__.pq.read_metadata"),
         patch.dict(os.environ, base_env, clear=True),
     ):
         result = main()
@@ -300,22 +333,30 @@ def test_rewrite_checks_remote_filesystem(
     assert mock_to_parquet.called == expect_export
 
 
-@patch("pgstac_geoparquet_exporter.__main__.sync_pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.get_pgstac_partitions")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch(
     "builtins.open",
     new_callable=mock_open,
     read_data="collections:\n  - name: test\n    partition_frequency: MS\n",
 )
-def test_monthly_partition_frequency(mock_file, mock_mkdir, mock_sync, base_env):
+def test_monthly_partition_frequency(
+    mock_file, mock_mkdir, mock_export, mock_partitions, base_env
+):
     """Verify monthly partition frequency is supported"""
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2024, 2, 1, tzinfo=timezone.utc)
+    mock_partitions.return_value = [
+        make_partition("test", "items_20240101_20240201.parquet", start, end)
+    ]
     base_env["EXPORT_MODE"] = "complete"
 
     with patch.dict(os.environ, base_env, clear=True):
         main()
 
-    # Verify sync_pgstac_to_parquet was called (partitioning handled by pgstac)
-    mock_sync.assert_called_once()
+    # Partitioning is handled by pgstac
+    mock_export.assert_called_once()
 
 
 @patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
@@ -355,7 +396,8 @@ def test_incremental_mode_with_collection(
 @patch(
     "builtins.open",
     new_callable=mock_open,
-    read_data="collections:\n  - name: test\n    updated_after: 2024-01-15T00:00:00Z\n",
+    # Quoted, as the Helm chart renders it
+    read_data='collections:\n  - name: test\n    updated_after: "2024-01-15T00:00:00Z"\n',
 )
 def test_incremental_mode_passes_updated_after_as_partition_windows(
     mock_file, mock_mkdir, mock_to_parquet, mock_get_partitions, base_env
@@ -383,6 +425,9 @@ def test_incremental_mode_passes_updated_after_as_partition_windows(
         2024, 1, 16, 0, 0, tzinfo=timezone.utc
     )
     mock_get_partitions.assert_called_once()
+    assert mock_get_partitions.call_args[0][1] == datetime(
+        2024, 1, 15, tzinfo=timezone.utc
+    )
 
 
 @patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
@@ -818,7 +863,8 @@ def test_summary_stats_logged(
     assert result == 1
 
 
-@patch("pgstac_geoparquet_exporter.__main__.sync_pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.get_pgstac_partitions")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch(
     "builtins.open",
@@ -826,10 +872,11 @@ def test_summary_stats_logged(
     read_data="collections:\n  - name: empty-partitioned\n    partition_frequency: YS\n",
 )
 def test_empty_partitioned_collection_does_not_crash(
-    mock_file, mock_mkdir, mock_sync, base_env
+    mock_file, mock_mkdir, mock_export, mock_partitions, base_env, caplog
 ):
     """Verify empty partitioned collection is handled gracefully"""
-    mock_sync.side_effect = StopIteration  # Empty collection
+    caplog.set_level("INFO")
+    mock_partitions.return_value = []  # Empty collection
     base_env["EXPORT_MODE"] = "complete"
 
     with patch.dict(os.environ, base_env, clear=True):
@@ -837,7 +884,8 @@ def test_empty_partitioned_collection_does_not_crash(
 
     # Should exit 0 when only empty collections are skipped
     assert result == 0
-    mock_sync.assert_called_once()
+    mock_export.assert_not_called()
+    assert "Skipped (empty): 1" in caplog.text
 
 
 @patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
@@ -876,11 +924,14 @@ def test_skipped_file_not_counted_as_failure(
     """Verify that skipped files (rewrite=false) are tracked separately"""
     caplog.set_level("INFO")
 
-    # First call is col1 (doesn't exist), second is col2 (exists)
-    mock_exists.side_effect = [False, True]
+    # col1 is rewritten by default, col2 exists and has rewrite=false
+    mock_exists.return_value = True
     base_env["EXPORT_MODE"] = "complete"
 
-    with patch.dict(os.environ, base_env, clear=True):
+    with (
+        patch("pgstac_geoparquet_exporter.__main__.pq.read_metadata"),
+        patch.dict(os.environ, base_env, clear=True),
+    ):
         result = main()
 
     # col1 should be exported, col2 should skip due to file existing and rewrite=false
@@ -970,3 +1021,77 @@ def test_incremental_mode_regression_cross_collection_isolation(
 
         # Verify collection parameter is passed
         assert "collection" in call[1]
+
+
+EXPORT_ALL_CONFIG = """
+exportAll: true
+collections: []
+settings:
+  chunk_size: 8192
+  max_chunk_mb: 64
+  statement_timeout: 3600000
+  rewrite: true
+overrides:
+  emdat-events:
+    chunk_size: 500
+"""
+
+
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.get_all_collections")
+@patch("pathlib.Path.mkdir")
+@patch("builtins.open", new_callable=mock_open, read_data=EXPORT_ALL_CONFIG)
+def test_settings_and_overrides_reach_export(
+    mock_file, mock_mkdir, mock_collections, mock_export, base_env
+):
+    """Top-level settings apply to every collection; overrides win per collection."""
+    mock_collections.return_value = [{"name": "cems-events"}, {"name": "emdat-events"}]
+    base_env["EXPORT_MODE"] = "complete"
+
+    with patch.dict(os.environ, base_env, clear=True):
+        assert main() == 0
+
+    calls = {c.kwargs["collection"]: c.kwargs for c in mock_export.call_args_list}
+    assert calls["cems-events"]["chunk_size"] == 8192
+    assert calls["emdat-events"]["chunk_size"] == 500
+    for kwargs in calls.values():
+        assert kwargs["max_chunk_mb"] == 64
+        assert kwargs["statement_timeout"] == 3600000
+
+
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: test\n",
+)
+def test_complete_mode_rewrites_by_default(mock_file, mock_export, base_env, tmp_path):
+    """Without rewrite set, a complete export replaces an existing file."""
+    (tmp_path / "test").mkdir()
+    (tmp_path / "test" / "full.parquet").write_bytes(b"existing")
+    base_env["EXPORT_MODE"] = "complete"
+    base_env["OUTPUT_PATH"] = str(tmp_path)
+
+    with patch.dict(os.environ, base_env, clear=True):
+        assert main() == 0
+
+    mock_export.assert_called_once()
+
+
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data="collections:\n  - name: test\n    rewrite: false\n",
+)
+def test_empty_existing_file_is_rewritten(mock_file, mock_export, base_env, tmp_path):
+    """A 0-byte file left by a failed run counts as missing, even with rewrite=false."""
+    (tmp_path / "test").mkdir()
+    (tmp_path / "test" / "full.parquet").write_bytes(b"")
+    base_env["EXPORT_MODE"] = "complete"
+    base_env["OUTPUT_PATH"] = str(tmp_path)
+
+    with patch.dict(os.environ, base_env, clear=True):
+        assert main() == 0
+
+    mock_export.assert_called_once()
