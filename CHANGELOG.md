@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.3.0...v0.3.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* stream exports with a collection-wide schema; handle empty structs and list/scalar mixes. ([#33](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/33)) ([e293fad](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/e293fadc56fbc2183aa2a578ea47e563a706519e))
+
 ## [0.3.0](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.2.4...v0.3.0) (2026-10-13)
 
 
