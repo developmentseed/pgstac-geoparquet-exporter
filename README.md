@@ -101,6 +101,8 @@ Exports entire collections to `{collection-name}/full.parquet`. This creates a b
 - For collections without partitioning: Single `full.parquet` file
 - For collections with yearly partitioning: Separate files per year (partition files)
 
+Collections are read twice (schema pass, then write pass), so memory stays per chunk. Empty objects such as `assets: {}` are written with a null `_empty` child, because Parquet cannot store empty structs; stac-geoparquet readers drop it, other readers (DuckDB, pyarrow) show it as a column. A property that is a list in some items and a scalar in others is written as a list.
+
 ### Incremental Mode
 
 Exports only changed items since the last update to `{collection-name}/updates/` (or your configured `incremental_dirname` directory). Each run writes new parquet output:

@@ -5,20 +5,22 @@ import logging
 import os
 import sys
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
 
 import psycopg
+import pyarrow as pa
 import pyarrow.fs as pafs
 import yaml
 from stac_geoparquet.pgstac_reader import (
     get_pgstac_partitions,
-    pgstac_to_parquet,
     sync_pgstac_to_parquet,
 )
+
+from pgstac_geoparquet_exporter.writer import export_items_to_parquet
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -27,10 +29,10 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExportStats:
     total_collections_seen: int = 0
-    exported_successfully: int = 0
     skipped_empty: int = 0
     skipped_existing: int = 0
-    failed_collections: int = 0
+    exported: list[str] = field(default_factory=list)
+    failed: dict[str, str] = field(default_factory=dict)
 
 
 def inject_stac_links(stac_api_url: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
@@ -128,7 +130,7 @@ def export_incremental_with_updated_after(
         output_file = (
             f"{output_path}/{dataset_dirname}/{timestamp}_{run_id}_{partition_name}"
         )
-        pgstac_to_parquet(
+        export_items_to_parquet(
             conninfo=conninfo,
             output_path=output_file,
             collection=collection_id,
@@ -251,7 +253,7 @@ def main() -> int:
                         stats.skipped_existing += 1
                         continue
 
-                    pgstac_to_parquet(
+                    export_items_to_parquet(
                         conninfo=conninfo,
                         output_path=output_file,
                         collection=collection_id,
@@ -261,15 +263,19 @@ def main() -> int:
                     )
 
                     logger.info(f"Exported {collection_id} to {output_file}")
-                stats.exported_successfully += 1
+                stats.exported.append(collection_id)
             except StopIteration:
                 logger.warning(
                     f"Skipping collection {collection_id}: no exportable items"
                 )
                 stats.skipped_empty += 1
             except Exception as e:
-                logger.error(f"Failed to export collection {collection_id}: {e}")
-                stats.failed_collections += 1
+                error = f"{type(e).__name__}: {e}"
+                logger.error(f"Failed to export collection {collection_id}: {error}")
+                stats.failed[collection_id] = error
+            finally:
+                # Hand memory back before the next collection
+                pa.default_memory_pool().release_unused()
 
     elif mode == "incremental":
         # Incremental mode - export only updated items to a delta parquet file.
@@ -303,7 +309,7 @@ def main() -> int:
                     output_file = build_incremental_output_file(
                         output_path, normalized_dirname
                     )
-                    pgstac_to_parquet(
+                    export_items_to_parquet(
                         conninfo=conninfo,
                         output_path=output_file,
                         collection=collection_id,
@@ -330,13 +336,17 @@ def main() -> int:
                     logger.info(
                         f"Exported {exported_count} incremental partition file(s) for {collection_id}"
                     )
-                stats.exported_successfully += 1
+                stats.exported.append(collection_id)
             except StopIteration:
                 logger.warning(f"Skipping collection {collection_id}: no updated items")
                 stats.skipped_empty += 1
             except Exception as e:
-                logger.error(f"Failed to export collection {collection_id}: {e}")
-                stats.failed_collections += 1
+                error = f"{type(e).__name__}: {e}"
+                logger.error(f"Failed to export collection {collection_id}: {error}")
+                stats.failed[collection_id] = error
+            finally:
+                # Hand memory back before the next collection
+                pa.default_memory_pool().release_unused()
     else:
         logger.error(f"Unknown export mode: {mode}")
         return 1
@@ -344,12 +354,16 @@ def main() -> int:
     # Print summary
     logger.info("\n=== Export Summary ===")
     logger.info(f"Total collections seen: {stats.total_collections_seen}")
-    logger.info(f"Exported successfully: {stats.exported_successfully}")
+    logger.info(f"Exported successfully: {len(stats.exported)}")
     logger.info(f"Skipped (empty): {stats.skipped_empty}")
     logger.info(f"Skipped (existing): {stats.skipped_existing}")
-    logger.info(f"Failed: {stats.failed_collections}")
+    logger.info(f"Failed: {len(stats.failed)}")
+    if stats.exported:
+        logger.info(f"Exported collections: {', '.join(stats.exported)}")
+    for collection_id, error in stats.failed.items():
+        logger.error(f"Failed collection {collection_id}: {error}")
 
-    if stats.failed_collections > 0:
+    if stats.failed:
         logger.error("Export completed with errors")
         return 1
     else:

@@ -1,14 +1,9 @@
 import os
-import sys
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch, mock_open, MagicMock
+from unittest.mock import patch, mock_open, MagicMock
 
 import pyarrow.fs as pafs
 import pytest
-
-# Mock heavy dependencies
-sys.modules["stac_geoparquet"] = Mock()
-sys.modules["stac_geoparquet.pgstac_reader"] = Mock()
 
 FileType = pafs.FileType  # type: ignore[attr-defined]
 
@@ -54,7 +49,7 @@ def test_yearly_partition_uses_sync_pgstac(mock_file, mock_mkdir, mock_sync, bas
     assert call_kwargs["chunk_size"] == 8192  # default
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -72,7 +67,7 @@ def test_no_partition_creates_single_file(
     with patch.dict(os.environ, base_env, clear=True):
         main()
 
-    # Verify pgstac_to_parquet was called
+    # Verify export_items_to_parquet was called
     mock_to_parquet.assert_called_once()
     call_kwargs = mock_to_parquet.call_args[1]
     assert "testhost" in call_kwargs["conninfo"]
@@ -81,7 +76,7 @@ def test_no_partition_creates_single_file(
     assert call_kwargs["chunk_size"] == 8192  # default
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -120,7 +115,7 @@ def test_incremental_mode_supported(mock_file, mock_mkdir, mock_sync, base_env):
     mock_sync.assert_not_called()
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -145,7 +140,7 @@ def test_connection_string_format(
     assert "password=testpass" in conninfo
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -166,7 +161,7 @@ def test_pgport_defaults_to_5432(
     assert "port=5432" in conninfo
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -187,7 +182,7 @@ def test_custom_output_path(
     assert output_path == "/custom/output/test/full.parquet"
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -209,7 +204,7 @@ def test_custom_config_path(
     mock_file.assert_called_with("/custom/config.yaml")
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -226,7 +221,7 @@ def test_returns_zero_on_success(
         assert main() == 0
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -244,12 +239,12 @@ def test_collection_config_options(
     with patch.dict(os.environ, base_env, clear=True):
         main()
 
-    # Check pgstac_to_parquet call
+    # Check export_items_to_parquet call
     call_kwargs = mock_to_parquet.call_args[1]
     assert call_kwargs["chunk_size"] == 16384
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -267,7 +262,7 @@ def test_rewrite_false_skips_existing_file(
     with patch.dict(os.environ, base_env, clear=True):
         main()
 
-    # Should not call pgstac_to_parquet
+    # Should not call export_items_to_parquet
     mock_to_parquet.assert_not_called()
 
 
@@ -279,7 +274,7 @@ def test_rewrite_false_skips_existing_file(
         ("true", FileType.File, True),
     ],
 )
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.exists")
 def test_rewrite_checks_remote_filesystem(
     mock_exists, mock_to_parquet, rewrite, file_type, expect_export, base_env
@@ -323,7 +318,7 @@ def test_monthly_partition_frequency(mock_file, mock_mkdir, mock_sync, base_env)
     mock_sync.assert_called_once()
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pgstac_geoparquet_exporter.__main__.build_incremental_output_file")
 @patch("pathlib.Path.mkdir")
 @patch(
@@ -355,7 +350,7 @@ def test_incremental_mode_with_collection(
 
 
 @patch("pgstac_geoparquet_exporter.__main__.get_pgstac_partitions")
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch(
     "builtins.open",
@@ -390,7 +385,7 @@ def test_incremental_mode_passes_updated_after_as_partition_windows(
     mock_get_partitions.assert_called_once()
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pgstac_geoparquet_exporter.__main__.build_incremental_output_file")
 @patch("pathlib.Path.mkdir")
 @patch(
@@ -433,7 +428,7 @@ def test_custom_filenames(
     )
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pgstac_geoparquet_exporter.__main__.build_incremental_output_file")
 @patch("pathlib.Path.mkdir")
 @patch(
@@ -465,7 +460,7 @@ def test_incremental_mode_writes_new_run_file(
     )
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pgstac_geoparquet_exporter.__main__.build_incremental_output_file")
 @patch("pathlib.Path.mkdir")
 @patch(
@@ -504,7 +499,7 @@ def test_incremental_mode_s3_writes_new_run_file(
     assert call_kwargs["filesystem"] == s3_fs
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch(
     "builtins.open",
@@ -533,7 +528,7 @@ def test_incremental_mode_abfs_writes_new_run_file(
     mock_mkdir.assert_not_called()
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists", return_value=False)
 @patch(
@@ -689,7 +684,7 @@ def test_build_incremental_output_file_empty_dirname_falls_back_to_updates():
     assert output_file.endswith(".parquet")
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -713,7 +708,7 @@ def test_empty_collection_does_not_crash(
     mock_to_parquet.assert_called_once()
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -738,7 +733,7 @@ def test_mixed_valid_and_empty_collections(
     assert mock_to_parquet.call_count == 2
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -762,7 +757,7 @@ def test_real_error_causes_nonzero_exit(
     mock_to_parquet.assert_called_once()
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -789,7 +784,7 @@ def test_all_collections_fail_returns_nonzero(
     assert "Exported successfully: 0" in log_text
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -817,6 +812,8 @@ def test_summary_stats_logged(
     assert "Exported successfully: 1" in log_text
     assert "Skipped (empty): 1" in log_text
     assert "Failed: 1" in log_text
+    assert "Exported collections: col1" in log_text
+    assert "Failed collection col3: RuntimeError: Test error" in log_text
     # Should exit 1 because of the error
     assert result == 1
 
@@ -843,7 +840,7 @@ def test_empty_partitioned_collection_does_not_crash(
     mock_sync.assert_called_once()
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch(
     "builtins.open",
@@ -865,7 +862,7 @@ def test_incremental_mode_empty_collection(
     mock_to_parquet.assert_called_once()
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.exists")
 @patch(
@@ -901,7 +898,7 @@ def test_skipped_file_not_counted_as_failure(
 # Tests for cross-collection bug fix
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch(
     "builtins.open",
@@ -933,7 +930,7 @@ def test_incremental_mode_multiple_collections_isolated(
     assert all(path.endswith(".parquet") for path in call_paths)
 
 
-@patch("pgstac_geoparquet_exporter.__main__.pgstac_to_parquet")
+@patch("pgstac_geoparquet_exporter.__main__.export_items_to_parquet")
 @patch("pathlib.Path.mkdir")
 @patch(
     "builtins.open",

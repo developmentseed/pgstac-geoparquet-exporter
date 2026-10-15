@@ -631,7 +631,7 @@ wheels = [
 
 [[package]]
 name = "pgstac-geoparquet-exporter"
-version = "0.2.4"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "fsspec" },
@@ -663,7 +663,7 @@ requires-dist = [
     { name = "pypgstac", specifier = ">=0.8.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.0" },
     { name = "pyyaml", specifier = ">=6.0" },
-    { name = "stac-geoparquet", git = "https://github.com/stac-utils/stac-geoparquet.git?rev=main" },
+    { name = "stac-geoparquet", specifier = "==0.8.2" },
     { name = "tqdm", specifier = ">=4.0.0" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
 ]
@@ -1322,8 +1322,8 @@ wheels = [
 
 [[package]]
 name = "stac-geoparquet"
-version = "0.7.1.dev13+g29bba7974"
-source = { git = "https://github.com/stac-utils/stac-geoparquet.git?rev=main#29bba79749d369c53287716be7701e3103b0ba84" }
+version = "0.8.2"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ciso8601" },
     { name = "geopandas" },
@@ -1336,6 +1336,10 @@ dependencies = [
     { name = "pystac" },
     { name = "shapely" },
     { name = "types-psutil" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/30/fc/1961b507b13d693279a404f2423c27c71e5f01883af7f422aefb35a5330c/stac_geoparquet-0.8.2.tar.gz", hash = "sha256:7a3de5b0b36f1d4cf2e522a23ce36c5570e290753e5b93cc9d7cad8da8b60b09", size = 1962738, upload-time = "2026-08-12T14:11:50.592Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ec/e8/9f0983d5698025959992206c61e15619ce953d3906791b6a337fa9f625f6/stac_geoparquet-0.8.2-py3-none-any.whl", hash = "sha256:0a67d237159c6a790538a1ef66d4698c529d40795567f7266b60dc2f5aee880b", size = 32691, upload-time = "2026-08-12T14:11:49.146Z" },
 ]
 
 [[package]]
