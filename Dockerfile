@@ -1,4 +1,20 @@
+FROM python:3.11-slim AS builder
+
+# Install uv
+RUN pip install --no-cache-dir uv
+
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+COPY src/ src/
+
+# Install the locked dependencies and the project into /opt/venv
+RUN UV_PROJECT_ENVIRONMENT=/opt/venv UV_PYTHON_DOWNLOADS=never \
+    uv sync --frozen --no-dev --no-editable --no-cache
+
 FROM python:3.11-slim
+
+# The app runs from /opt/venv and never uses the base image's packaging tools
+RUN python -m pip uninstall -y pip setuptools wheel
 
 # Create non-root user
 RUN useradd -m -u 1000 user && \
@@ -7,22 +23,8 @@ RUN useradd -m -u 1000 user && \
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    g++ \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install uv
-RUN pip install --no-cache-dir uv
-
-# Copy project files
-COPY --chown=user:user pyproject.toml .
-COPY --chown=user:user src/ src/
-
-# Install dependencies with uv (as root)
-RUN uv pip install --system --no-cache -e .
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Switch to non-root user
 USER user
