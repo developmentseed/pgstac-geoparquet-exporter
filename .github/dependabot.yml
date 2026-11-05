@@ -29,3 +29,15 @@ updates:
         update-types:
           - "minor"
           - "patch"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    cooldown:
+      default-days: 7
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    ignore:
+      # CI only tests Python 3.11, so moving off it is a deliberate upgrade
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
