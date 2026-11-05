@@ -15,8 +15,7 @@ dependencies = [
     "pypgstac>=0.8.0",
     "pyyaml>=6.0",
     "fsspec>=2023.1.0",
-    # Capped: wheels from 25 on drop py.typed, which mypy checks against
-    "pyarrow>=16.0.0,<25",  # pyarrow.fs.AzureFileSystem
+    "pyarrow>=16.0.0",  # pyarrow.fs.AzureFileSystem
     "tqdm>=4.0.0",
 ]
 
