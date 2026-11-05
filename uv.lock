@@ -760,7 +760,7 @@ requires-dist = [
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.0" },
     { name = "psycopg-pool", specifier = ">=3.0" },
-    { name = "pyarrow", specifier = ">=16.0.0,<25" },
+    { name = "pyarrow", specifier = ">=16.0.0" },
     { name = "pypgstac", specifier = ">=0.8.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.0" },
     { name = "pyyaml", specifier = ">=6.0" },

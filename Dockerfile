@@ -1,9 +1,7 @@
-# A stage rather than COPY --from=<image>, as Dependabot only reads FROM lines
-FROM ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 AS uv
+FROM python:3.12-slim@sha256:e695ab189fa2d082b1c61c69a6b888a5adeca61ceeccad107b1ed2a125721a9e AS builder
 
-FROM python:3.11-slim AS builder
-
-COPY --from=uv /uv /usr/local/bin/uv
+# Only the build needs uv: it stays in this stage
+RUN python -m pip install --no-cache-dir uv==0.13.7
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
@@ -13,10 +11,12 @@ COPY src/ src/
 RUN UV_PROJECT_ENVIRONMENT=/opt/venv UV_PYTHON_DOWNLOADS=never \
     uv sync --frozen --no-dev --no-editable
 
-FROM python:3.11-slim
+FROM python:3.12-slim@sha256:e695ab189fa2d082b1c61c69a6b888a5adeca61ceeccad107b1ed2a125721a9e
 
-# The app runs from /opt/venv and never uses the base image's packaging tools
-RUN python -m pip uninstall -y pip setuptools wheel
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
+# The app runs from /opt/venv and never uses the base image's pip
+RUN python -m pip uninstall -y pip
 
 # Create non-root user
 RUN useradd -m -u 1000 user && \
