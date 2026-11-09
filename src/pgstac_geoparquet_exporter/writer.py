@@ -155,7 +155,7 @@ def export_items_to_parquet(
     schema = pa.schema([f.with_type(_fill_empty_structs(f.type)) for f in schema])
 
     if filesystem is None:
-        filesystem, filepath = pafs.FileSystem.from_uri(output_path)  # type: ignore[attr-defined]
+        filesystem, filepath = pafs.FileSystem.from_uri(output_path)
     else:
         filepath = str(output_path)
     filesystem.create_dir(str(Path(filepath).parent), recursive=True)
@@ -173,20 +173,20 @@ def export_items_to_parquet(
                     batch.schema,
                     schema_version=schema_version,  # type: ignore[arg-type]
                 )
-                writer = pq.ParquetWriter(  # type: ignore[no-untyped-call]
+                writer = pq.ParquetWriter(
                     filepath,
                     batch.schema.with_metadata(metadata),
                     filesystem=filesystem,
                 )
-            writer.write_batch(batch)  # type: ignore[no-untyped-call]
+            writer.write_batch(batch)
             rows += batch.num_rows
         if writer is not None:
-            writer.close()  # type: ignore[no-untyped-call]
+            writer.close()
     except BaseException:
         if writer is not None:
             # Don't let a second close() error hide the original one
             with suppress(Exception):
-                writer.close()  # type: ignore[no-untyped-call]
+                writer.close()
             try:
                 filesystem.delete_file(filepath)
             except OSError as e:
