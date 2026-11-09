@@ -663,7 +663,7 @@ requires-dist = [
     { name = "pypgstac", specifier = ">=0.8.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.0" },
     { name = "pyyaml", specifier = ">=6.0" },
-    { name = "stac-geoparquet", specifier = "==0.8.2" },
+    { name = "stac-geoparquet", specifier = "==0.8.3" },
     { name = "tqdm", specifier = ">=4.0.0" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
 ]
@@ -1309,19 +1309,19 @@ wheels = [
 
 [[package]]
 name = "smart-open"
-version = "7.6.0"
+version = "9.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/14/33/7a00ac9b4a63afb4279b99a766f6cbe56c443526dcbf5db97b219e21fde9/smart_open-7.6.0.tar.gz", hash = "sha256:44717f46b5ff276fac03b88e5d13d1c416f064f3b7b081381b0fa8889004bd7e", size = 54548, upload-time = "2026-04-13T09:48:04.347Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b3/fb/19b6597c88ed450aa48e903b0043cdfd8e1d483b1dd78fb2a7b10897cf94/smart_open-9.0.1.tar.gz", hash = "sha256:9dd0de10c98c7dfc6c05096fb8bc5ef3ed280c994ec2aa8fb747ab14bd528804", size = 65045, upload-time = "2026-10-29T20:08:21.912Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/bc/2761410d0541e975f384bc89f062d716bf119499dd097eb1af33dcd3b1c0/smart_open-7.6.0-py3-none-any.whl", hash = "sha256:2a78f454610a826aa688065b54b4a0a9b12a5599fa61d5190e9bac2df5e5f53f", size = 64591, upload-time = "2026-04-13T09:48:02.687Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/71/9cc12b1b8d5483696cc536ac7f9e113a4b0971d3a284cd6e74314e4236b4/smart_open-9.0.1-py3-none-any.whl", hash = "sha256:0d5fdbc8b90c90e57651bd369028afecbcf89273e3ff9cd5f66ddfee78a8302a", size = 76007, upload-time = "2026-10-29T20:08:20.294Z" },
 ]
 
 [[package]]
 name = "stac-geoparquet"
-version = "0.8.2"
+version = "0.8.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ciso8601" },
@@ -1336,9 +1336,9 @@ dependencies = [
     { name = "shapely" },
     { name = "types-psutil" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/30/fc/1961b507b13d693279a404f2423c27c71e5f01883af7f422aefb35a5330c/stac_geoparquet-0.8.2.tar.gz", hash = "sha256:7a3de5b0b36f1d4cf2e522a23ce36c5570e290753e5b93cc9d7cad8da8b60b09", size = 1962738, upload-time = "2026-08-12T14:11:50.592Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/01/9e4ceacf2974fd3efdba4c237920e2f1958359fa155205db9943216590f8/stac_geoparquet-0.8.3.tar.gz", hash = "sha256:5eb63e3f7221e360b23fd7c201fc00e07c69560d059cea46d40762a392129f87", size = 1970716, upload-time = "2026-10-21T20:44:23.252Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ec/e8/9f0983d5698025959992206c61e15619ce953d3906791b6a337fa9f625f6/stac_geoparquet-0.8.2-py3-none-any.whl", hash = "sha256:0a67d237159c6a790538a1ef66d4698c529d40795567f7266b60dc2f5aee880b", size = 32691, upload-time = "2026-08-12T14:11:49.146Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/80/2c790bb91c4928df5d0037f96f2198b71a678efb18de8bea8c27e8f63dd3/stac_geoparquet-0.8.3-py3-none-any.whl", hash = "sha256:d3dad6545206e180903edce60b21992c244cd91ff22622371a79ef0c060a3a40", size = 32894, upload-time = "2026-10-21T20:44:21.833Z" },
 ]
 
 [[package]]
