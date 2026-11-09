@@ -82,7 +82,7 @@ def output_exists(path: str, filesystem: Any | None) -> bool:
     if filesystem is None:
         return Path(path).exists()
     file_type = filesystem.get_file_info(path).type
-    return bool(file_type != pafs.FileType.NotFound)  # type: ignore[attr-defined]
+    return bool(file_type != pafs.FileType.NotFound)
 
 
 def parse_abfs_url(url: str) -> tuple[str, str]:
@@ -189,7 +189,7 @@ def main() -> int:
         region = os.environ.get("AWS_REGION", "us-east-1")
 
         # endpoint_override supports S3-compatible servers
-        filesystem = pafs.S3FileSystem(  # type: ignore[attr-defined]
+        filesystem = pafs.S3FileSystem(
             access_key=os.environ.get("AWS_ACCESS_KEY_ID"),
             secret_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
             endpoint_override=endpoint,
@@ -203,7 +203,7 @@ def main() -> int:
     elif output_base.startswith(("abfs://", "abfss://")):
         # Authenticates via DefaultAzureCredential (e.g. workload identity)
         account_name, output_base = parse_abfs_url(output_base)
-        filesystem = pafs.AzureFileSystem(account_name=account_name)  # type: ignore[attr-defined]
+        filesystem = pafs.AzureFileSystem(account_name=account_name)
 
     stats = ExportStats()
 
