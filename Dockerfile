@@ -1,7 +1,9 @@
 FROM python:3.12-slim@sha256:e695ab189fa2d082b1c61c69a6b888a5adeca61ceeccad107b1ed2a125721a9e AS builder
 
-# Only the build needs uv: it stays in this stage
-RUN python -m pip install --no-cache-dir uv==0.13.7
+# Only the build needs uv: it stays in this stage.
+# The pin has its own file because Dependabot does not read RUN lines; the uv entry in dependabot.yml bumps it.
+COPY docker/requirements.txt /tmp/requirements.txt
+RUN python -m pip install --no-cache-dir -r /tmp/requirements.txt
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
