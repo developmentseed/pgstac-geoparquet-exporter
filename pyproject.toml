@@ -9,7 +9,7 @@ description = "Export pgSTAC collections to GeoParquet."
 requires-python = ">=3.11"
 dependencies = [
     # Pinned: writer.py uses private stac-geoparquet modules
-    "stac-geoparquet==0.8.2",
+    "stac-geoparquet==0.8.3",
     "psycopg[binary]>=3.0",
     "psycopg-pool>=3.0",
     "pypgstac>=0.8.0",
