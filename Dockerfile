@@ -1,4 +1,4 @@
-FROM python:3.12-slim@sha256:e695ab189fa2d082b1c61c69a6b888a5adeca61ceeccad107b1ed2a125721a9e AS builder
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b AS builder
 
 # Only the build needs uv: it stays in this stage.
 # The pin has its own file because Dependabot does not read RUN lines; the uv entry in dependabot.yml bumps it.
@@ -13,7 +13,7 @@ COPY src/ src/
 RUN UV_PROJECT_ENVIRONMENT=/opt/venv UV_PYTHON_DOWNLOADS=never \
     uv sync --frozen --no-dev --no-editable
 
-FROM python:3.12-slim@sha256:e695ab189fa2d082b1c61c69a6b888a5adeca61ceeccad107b1ed2a125721a9e
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
 
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
