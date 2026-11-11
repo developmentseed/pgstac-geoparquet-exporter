@@ -39,7 +39,7 @@ def export(items: list[dict[str, Any]], path: Path, chunk_size: int = 2) -> int:
 
 
 def read(path: Path) -> pa.Table:
-    return pq.read_table(path)  # type: ignore[no-untyped-call]
+    return pq.read_table(path)
 
 
 def test_empty_assets(tmp_path):

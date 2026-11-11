@@ -5,7 +5,7 @@ from unittest.mock import patch, mock_open, MagicMock
 import pyarrow.fs as pafs
 import pytest
 
-FileType = pafs.FileType  # type: ignore[attr-defined]
+FileType = pafs.FileType
 
 from pgstac_geoparquet_exporter.__main__ import (  # noqa: E402
     build_incremental_output_file,
