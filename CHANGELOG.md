@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.3.2](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.3.1...v0.3.2) (2026-11-11)
+
+
+### Bug Fixes
+
+* **deps:** bump python from `e695ab1` to `5e2bdb1` ([#50](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/50)) ([8a97b7e](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/8a97b7ec3b4c0a3d5f5267640c9b6de33787c67e))
+* **docker:** build the runtime image from uv.lock without build tools ([#40](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/40)) ([f9970ec](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/f9970eca5d19a0b32be5545f9341d0cf2271f277))
+
+
+### Chores
+
+* **deps:** bump astral-sh/setup-uv ([#44](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/44)) ([4c65b39](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/4c65b39f83d1b0c83132e1a0ffecb7656559e010))
+* **deps:** bump astral-sh/setup-uv from 8.3.2 to 10.3.0 ([37dbaeb](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/37dbaeb24408c683d2ea113cc849e46902623e7f))
+* **deps:** bump astral-sh/setup-uv from 8.3.2 to 10.3.0 ([d6274fb](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/d6274fb88061b31338abb3f26d897153fc107c79))
+* **deps:** bump mypy from 1.20.2 to 2.4.1 ([#53](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/53)) ([4c9c576](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/4c9c576466316a19b6dad737e10b39b2ff36ca8e))
+* **deps:** bump pyarrow from 24.0.0 to 26.0.0 ([#49](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/49)) ([d45ccf4](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/d45ccf46b69515c5572822cd62119ed068987e9f))
+* **deps:** bump python-dateutil from 2.9.0.post0 to 4.0.0 ([#46](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/46)) ([46cc628](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/46cc628736caab2ba0bc09d394d7ea2eb9f15588))
+* **deps:** bump smart-open from 7.6.0 to 9.0.1 ([#47](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/47)) ([fc3f5ed](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/fc3f5ed78f0bff0728651e63a907853fee5ed741))
+* **deps:** bump stac-geoparquet ([87b92a3](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/87b92a3663888dd583dfcf6dece67a4cec427727))
+* **deps:** bump stac-geoparquet from 0.8.2 to 0.8.3 in the minor-and-patch group ([46465e3](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/46465e3719211604771bb45ff68244a1859e232c))
+* **deps:** bump the minor-and-patch group across 1 directory with 3 updates ([85dd305](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/85dd30532f0b301c06a1a147d492605547754106))
+* **deps:** bump the minor-and-patch group across 1 directory with 3 updates ([06b53db](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/06b53dbc048dbd77756f3774170759f05412686b))
+* **deps:** bump the minor-and-patch group with 33 updates ([#45](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/45)) ([3d4aa45](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/3d4aa45cdddb083c002738878125d07862ba9ae5))
+* **deps:** bump the minor-and-patch group with 4 updates ([#51](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/51)) ([608fbbc](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/608fbbc7edb440fda3dd8e6d3b5ea7276160db69))
+* **deps:** bump the uv group across 1 directory with 4 updates ([d3b6885](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/d3b688524bf47caf7fde9fb209b7ca08e0b8dd35))
+* **deps:** bump the uv group across 1 directory with 4 updates ([8e82eb9](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/8e82eb90b7a94598f2c05aaf88203ada28c5ecdd))
+* **deps:** bump types-pyyaml from 6.0.12.20260408 to 6.0.12.20261030 ([#48](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/48)) ([95537f4](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/95537f4872efafa3c247cb520ee1a900632ad8ce))
+* **deps:** bump types-pyyaml from 6.0.12.20261030 to 6.0.12.20261103 ([#52](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/52)) ([eadf25c](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/eadf25cce412847d0168ca6dc5f08096d8f99e1b))
+
+
+### CI/CD
+
+* **dependabot:** update uv.lock and transitive packages ([#41](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/41)) ([544405e](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/544405eec0596cf5ea7fb263f496e775450f9456))
+
 ## [0.3.1](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.3.0...v0.3.1) (2026-10-15)
 
 
