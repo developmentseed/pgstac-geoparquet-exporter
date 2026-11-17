@@ -27,6 +27,10 @@ dev = [
     "types-PyYAML>=6.0",
 ]
 
+[dependency-groups]
+# The image builds psycopg's C module against Debian's libpq (see Dockerfile)
+image = ["psycopg[c]"]
+
 [tool.setuptools]
 packages = ["pgstac_geoparquet_exporter"]
 package-dir = {"" = "src"}
