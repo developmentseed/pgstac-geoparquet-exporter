@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.3](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.3.2...v0.3.3) (2026-11-25)
+
+
+### Bug Fixes
+
+* **docker:** build psycopg against Debian's libpq ([#56](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/56)) ([60b2d56](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/60b2d56eadf32018816c910375dcae126ec61ab4))
+
+
+### Chores
+
+* **deps:** bump docker/login-action from 4.7.0 to 4.8.0 in the minor-and-patch group ([#54](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/54)) ([a0eac6a](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/a0eac6ab276e06e01ccbb8ca445c997b155ca313))
+* **deps:** bump the minor-and-patch group with 5 updates ([#55](https://github.com/developmentseed/pgstac-geoparquet-exporter/issues/55)) ([2d5ec7b](https://github.com/developmentseed/pgstac-geoparquet-exporter/commit/2d5ec7b687069d7bbf8c891dd3c531b1fc710b23))
+
 ## [0.3.2](https://github.com/developmentseed/pgstac-geoparquet-exporter/compare/v0.3.1...v0.3.2) (2026-11-11)
 
 
